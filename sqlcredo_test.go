@@ -46,6 +46,12 @@ CREATE TABLE IF NOT EXISTS user (
 		{"u1", "Carl", nil, newTime("1973-01-09")},
 		{"u2", "Ann", ptr("Stone"), newTime("1985-08-01")},
 	}
+
+	testUserValues = []User{
+		{"u0", "John", ptr("Smith"), newTime("1989-03-05")},
+		{"u1", "Carl", nil, newTime("1973-01-09")},
+		{"u2", "Ann", ptr("Stone"), newTime("1985-08-01")},
+	}
 )
 
 type UserRepo struct {
@@ -106,6 +112,16 @@ func TestGetAll(t *testing.T) {
 	assert.Equal(t, testUsers, got)
 }
 
+func TestGetAllValues(t *testing.T) {
+	r, teardown := setup(t, testUsers...)
+	defer teardown()
+
+	got, err := r.GetAllValues()
+
+	assert.NoError(t, err)
+	assert.Equal(t, testUserValues, got)
+}
+
 func TestGetPage(t *testing.T) {
 	r, teardown := setup(t, testUsers...)
 	defer teardown()
@@ -139,6 +155,18 @@ func TestGetByID(t *testing.T) {
 	assert.Equal(t, *u, *got)
 }
 
+func TestGetValueByID(t *testing.T) {
+	r, teardown := setup(t, testUsers...)
+	defer teardown()
+
+	u := testUserValues[1]
+
+	got, err := r.GetValueByID(u.ID)
+
+	assert.NoError(t, err)
+	assert.Equal(t, u, got)
+}
+
 func TestGetByIDs(t *testing.T) {
 	r, teardown := setup(t, testUsers...)
 	defer teardown()
@@ -152,6 +180,21 @@ func TestGetByIDs(t *testing.T) {
 	assert.Equal(t, 2, len(got))
 	assert.Equal(t, *u1, *got[0])
 	assert.Equal(t, *u2, *got[1])
+}
+
+func TestGetValuesByIDs(t *testing.T) {
+	r, teardown := setup(t, testUsers...)
+	defer teardown()
+
+	u1 := testUserValues[1]
+	u2 := testUserValues[2]
+
+	got, err := r.GetValuesByIDs([]Identity{u1.ID, u2.ID})
+
+	assert.NoError(t, err)
+	assert.Equal(t, 2, len(got))
+	assert.Equal(t, u1, got[0])
+	assert.Equal(t, u2, got[1])
 }
 
 func TestDelete(t *testing.T) {

@@ -68,12 +68,18 @@ type CRUD[T any, I comparable] interface {
 
 	GetAll(opts ...PagingOpt) ([]*T, error)
 	GetAllContext(ctx context.Context, opts ...PagingOpt) ([]*T, error)
+	GetAllValues(opts ...PagingOpt) ([]T, error)
+	GetAllValuesContext(ctx context.Context, opts ...PagingOpt) ([]T, error)
 
 	GetByID(id I) (*T, error)
 	GetByIDContext(ctx context.Context, id I) (*T, error)
+	GetValueByID(id I) (T, error)
+	GetValueByIDContext(ctx context.Context, id I) (T, error)
 
 	GetByIDs(ids []I) ([]*T, error)
 	GetByIDsContext(ctx context.Context, ids []I) ([]*T, error)
+	GetValuesByIDs(ids []I) ([]T, error)
+	GetValuesByIDsContext(ctx context.Context, ids []I) ([]T, error)
 
 	Create(e *T) error
 	CreateContext(ctx context.Context, e *T) error
@@ -144,6 +150,18 @@ func (r *sqlCredo[T, I]) GetAll(opts ...PagingOpt) ([]*T, error) {
 }
 
 func (r *sqlCredo[T, I]) GetAllContext(ctx context.Context, opts ...PagingOpt) ([]*T, error) {
+	return r.selectBuilderContext(ctx, r.getAllQueryBuilder(ctx, opts...))
+}
+
+func (r *sqlCredo[T, I]) GetAllValues(opts ...PagingOpt) ([]T, error) {
+	return r.GetAllValuesContext(context.Background(), opts...)
+}
+
+func (r *sqlCredo[T, I]) GetAllValuesContext(ctx context.Context, opts ...PagingOpt) ([]T, error) {
+	return r.selectValuesBuilderContext(ctx, r.getAllQueryBuilder(ctx, opts...))
+}
+
+func (r *sqlCredo[T, I]) getAllQueryBuilder(ctx context.Context, opts ...PagingOpt) queryBuilder {
 	params := &pagingParams{}
 
 	for _, o := range opts {
@@ -168,7 +186,7 @@ func (r *sqlCredo[T, I]) GetAllContext(ctx context.Context, opts ...PagingOpt) (
 		}
 	}
 
-	return r.selectBuilderContext(ctx, builder.ToSQL)
+	return builder.ToSQL
 }
 
 func (r *sqlCredo[T, I]) GetByID(id I) (*T, error) {
@@ -193,6 +211,30 @@ func (r *sqlCredo[T, I]) GetByIDContext(ctx context.Context, id I) (*T, error) {
 	return entities[0], nil
 }
 
+func (r *sqlCredo[T, I]) GetValueByID(id I) (T, error) {
+	return r.GetValueByIDContext(context.Background(), id)
+}
+
+func (r *sqlCredo[T, I]) GetValueByIDContext(ctx context.Context, id I) (T, error) {
+	builder := goqu.From(r.table).
+		Where(goqu.I(r.idColumn).Eq(id)).
+		Prepared(true)
+
+	var empty T
+
+	entities, err := r.selectValuesBuilderContext(context.Background(), builder.ToSQL)
+	if err != nil {
+		return empty, fmt.Errorf("failed to select entities values: %w", err)
+	}
+
+	// TODO: check there is exact one entity in result
+	if len(entities) < 1 {
+		return empty, errors.New("entity value not found")
+	}
+
+	return entities[0], nil
+}
+
 func (r *sqlCredo[T, I]) GetByIDs(ids []I) ([]*T, error) {
 	return r.GetByIDsContext(context.Background(), ids)
 }
@@ -206,6 +248,24 @@ func (r *sqlCredo[T, I]) GetByIDsContext(ctx context.Context, ids []I) ([]*T, er
 	entities, err := r.selectBuilderContext(ctx, builder.ToSQL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to select entities: %w", err)
+	}
+
+	return entities, nil
+}
+
+func (r *sqlCredo[T, I]) GetValuesByIDs(ids []I) ([]T, error) {
+	return r.GetValuesByIDsContext(context.Background(), ids)
+}
+
+func (r *sqlCredo[T, I]) GetValuesByIDsContext(ctx context.Context, ids []I) ([]T, error) {
+	builder := goqu.From(r.table).
+		Where(goqu.I(r.idColumn).In(ids)).
+		Order(goqu.I(r.idColumn).Asc()).
+		Prepared(true)
+
+	entities, err := r.selectValuesBuilderContext(ctx, builder.ToSQL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to select values entities: %w", err)
 	}
 
 	return entities, nil
@@ -283,6 +343,20 @@ func (r *sqlCredo[T, I]) selectBuilderContext(ctx context.Context, builder query
 	var entities []*T
 	if err = r.SelectManyContext(ctx, &entities, sql, args...); err != nil {
 		return nil, fmt.Errorf("failed to load enitites: %w", err)
+	}
+
+	return entities, nil
+}
+
+func (r *sqlCredo[T, I]) selectValuesBuilderContext(ctx context.Context, builder queryBuilder) ([]T, error) {
+	sql, args, err := builder()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create select values query: %w", err)
+	}
+
+	var entities []T
+	if err = r.SelectManyContext(ctx, &entities, sql, args...); err != nil {
+		return nil, fmt.Errorf("failed to load enitity values: %w", err)
 	}
 
 	return entities, nil
