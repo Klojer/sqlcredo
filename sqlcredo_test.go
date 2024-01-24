@@ -1,16 +1,15 @@
 package sqlcredo_test
 
 import (
-	"database/sql"
 	"fmt"
-	"testing"
 	"time"
 
-	"gitlab.com/onrooh/sqlcredo"
+	g "github.com/onsi/ginkgo/v2"
+	o "github.com/onsi/gomega"
 
 	_ "github.com/mattn/go-sqlite3"
 
-	"github.com/stretchr/testify/assert"
+	sc "gitlab.com/onrooh/sqlcredo"
 )
 
 type Identity string
@@ -41,21 +40,17 @@ CREATE TABLE IF NOT EXISTS user (
 );
 `
 
-	testUsers = []*User{
-		{"u0", "John", ptr("Smith"), newTime("1989-03-05")},
-		{"u1", "Carl", nil, newTime("1973-01-09")},
-		{"u2", "Ann", ptr("Stone"), newTime("1985-08-01")},
-	}
-
 	testUserValues = []User{
 		{"u0", "John", ptr("Smith"), newTime("1989-03-05")},
 		{"u1", "Carl", nil, newTime("1973-01-09")},
 		{"u2", "Ann", ptr("Stone"), newTime("1985-08-01")},
 	}
+
+	testUserPtrs = wrapWithPtrs(testUserValues)
 )
 
 type UserRepo struct {
-	sqlcredo.SQLCredo[User, Identity]
+	sc.SQLCredo[User, Identity]
 }
 
 const CountByLastNameExistsQuery = `
@@ -83,195 +78,151 @@ func (r *UserRepo) CountByLastNameExists() (map[string]int, error) {
 	return res, nil
 }
 
-func TestInitSchema(t *testing.T) {
-	_, teardown := setup(t)
-	defer teardown()
+var debugFunc = func(query string, args ...any) {
+	g.GinkgoWriter.Printf("Query: [%s]; Args: %+v\n", query, args)
 }
 
-func TestCreate(t *testing.T) {
-	r, teardown := setup(t)
-	defer teardown()
+var _ = g.Describe("UserRepo", func() {
+	var repo UserRepo
 
-	u := testUsers[0]
+	g.BeforeEach(func() {
+		repo = UserRepo{
+			SQLCredo: sc.NewSQLCredo[User, Identity](db, driver, tableName, idColumn).
+				WithDebugFunc(debugFunc),
+		}
 
-	err := r.Create(u)
-	assert.NoError(t, err)
+		o.Expect(repo.InitSchema(schema)).NotTo(o.HaveOccurred())
 
-	got, err := r.GetByID(u.ID)
-	assert.NoError(t, err)
-	assert.Equal(t, *u, *got)
-}
+		for _, u := range testUserPtrs {
+			o.Expect(repo.Create(u)).NotTo(o.HaveOccurred())
+		}
 
-func TestGetAll(t *testing.T) {
-	r, teardown := setup(t, testUsers...)
-	defer teardown()
+		cnt, err := repo.Count()
+		o.Expect(err).NotTo(o.HaveOccurred())
+		o.Expect(int(cnt)).To(o.Equal(len(testUserPtrs)))
+	})
 
-	got, err := r.GetAll()
+	g.AfterEach(func() {
+		repo.DeleteAll()
+	})
 
-	assert.NoError(t, err)
-	assert.Equal(t, testUsers, got)
-}
+	g.Context("base methods", func() {
+		g.When("create user", func() {
+			var user *User
 
-func TestGetAllValues(t *testing.T) {
-	r, teardown := setup(t, testUsers...)
-	defer teardown()
+			g.JustBeforeEach(func() {
+				user = &User{"u4", "Gordon", ptr("Gibs"), newTime("1931-09-03")}
+				o.Expect(repo.Create(user)).NotTo(o.HaveOccurred())
+			})
 
-	got, err := r.GetAllValues()
+			g.It("should be accessable by id", func() {
+				got, err := repo.GetByID(user.ID)
+				o.Expect(err).NotTo(o.HaveOccurred())
+				o.Expect(*got).To(o.Equal(*user))
+			})
+		})
 
-	assert.NoError(t, err)
-	assert.Equal(t, testUserValues, got)
-}
+		g.When("get all users", func() {
+			g.It("should contain all records", func() {
+				o.Expect(repo.GetAll()).To(o.Equal(testUserPtrs))
+			})
 
-func TestGetPage(t *testing.T) {
-	r, teardown := setup(t, testUsers...)
-	defer teardown()
+			g.It("should contain all record values", func() {
+				o.Expect(repo.GetAllValues()).To(o.Equal(testUserValues))
+			})
 
-	gotPage1, err := r.GetAll(
-		sqlcredo.WithLimit(2),
-		sqlcredo.WithOffset(0),
-		sqlcredo.WithOrderColumn("id"),
-	)
-	assert.NoError(t, err)
-	assert.Equal(t, testUsers[0:2], gotPage1)
+			g.When("get first page", func() {
+				g.It("should contain first page records", func() {
+					o.Expect(repo.GetAllValues(sc.WithOffset(0), sc.WithLimit(2), sc.WithOrderColumn("id"))).
+						To(o.Equal(testUserValues[0:2]))
+				})
+			})
 
-	gotPage2, err := r.GetAll(
-		sqlcredo.WithLimit(2),
-		sqlcredo.WithOffset(2),
-		sqlcredo.WithOrderColumn("id"),
-	)
-	assert.NoError(t, err)
-	assert.Equal(t, testUsers[2:], gotPage2)
-}
+			g.When("get second page", func() {
+				g.It("should contain second page records", func() {
+					o.Expect(repo.GetAllValues(sc.WithOffset(2), sc.WithLimit(2), sc.WithOrderColumn("id"))).
+						To(o.Equal(testUserValues[2:]))
+				})
+			})
+		})
 
-func TestGetByID(t *testing.T) {
-	r, teardown := setup(t, testUsers...)
-	defer teardown()
+		g.When("get user by id", func() {
+			g.Context("to pointer", func() {
+				g.It("should contain pointer to user", func() {
+					o.Expect(repo.GetByID(testUserPtrs[1].ID)).To(o.Equal(testUserPtrs[1]))
+				})
+			})
 
-	u := testUsers[1]
+			g.Context("to value", func() {
+				g.It("should contain value of user", func() {
+					o.Expect(repo.GetValueByID(testUserValues[2].ID)).To(o.Equal(testUserValues[2]))
+				})
+			})
+		})
 
-	got, err := r.GetByID(u.ID)
+		g.When("get users by ids", func() {
+			g.Context("to pointers", func() {
+				g.It("should contain slice of pointers", func() {
+					o.Expect(repo.GetByIDs([]Identity{testUserPtrs[1].ID, testUserPtrs[2].ID})).
+						To(o.Equal([]*User{testUserPtrs[1], testUserPtrs[2]}))
+				})
+			})
 
-	assert.NoError(t, err)
-	assert.Equal(t, *u, *got)
-}
+			g.Context("to values", func() {
+				g.It("should contain slice of values", func() {
+					o.Expect(repo.GetValuesByIDs([]Identity{testUserPtrs[1].ID, testUserPtrs[2].ID})).
+						To(o.Equal([]User{testUserValues[1], testUserValues[2]}))
+				})
+			})
+		})
 
-func TestGetValueByID(t *testing.T) {
-	r, teardown := setup(t, testUsers...)
-	defer teardown()
+		g.When("delete user", func() {
+			g.JustBeforeEach(func() {
+				o.Expect(repo.Delete(testUserValues[1].ID)).NotTo(o.HaveOccurred())
+			})
 
-	u := testUserValues[1]
+			g.It("should be absent in database", func() {
+				got, err := repo.GetByID(testUserValues[1].ID)
+				o.Expect(err).To(o.MatchError(sc.ErrRecordNotFound))
+				o.Expect(got).To(o.BeNil())
+			})
+		})
 
-	got, err := r.GetValueByID(u.ID)
+		g.When("update user", func() {
+			var updated *User
 
-	assert.NoError(t, err)
-	assert.Equal(t, u, got)
-}
+			g.JustBeforeEach(func() {
+				updated = testUserPtrs[1]
+				updated.FirstName = updated.FirstName + "_updated"
 
-func TestGetByIDs(t *testing.T) {
-	r, teardown := setup(t, testUsers...)
-	defer teardown()
+				o.Expect(repo.Update(updated.ID, updated)).NotTo(o.HaveOccurred())
+			})
 
-	u1 := testUsers[1]
-	u2 := testUsers[2]
+			g.It("should be updated in database", func() {
+				got, err := repo.GetValueByID(testUserValues[1].ID)
+				o.Expect(err).NotTo(o.HaveOccurred())
+				o.Expect(got).To(o.Equal(*updated))
+			})
+		})
 
-	got, err := r.GetByIDs([]Identity{u1.ID, u2.ID})
+		g.When("count users", func() {
+			g.It("should contain actual number of users", func() {
+				got, err := repo.Count()
+				o.Expect(err).NotTo(o.HaveOccurred())
+				o.Expect(int(got)).To(o.Equal(len(testUserPtrs)))
+			})
+		})
+	})
 
-	assert.NoError(t, err)
-	assert.Equal(t, 2, len(got))
-	assert.Equal(t, *u1, *got[0])
-	assert.Equal(t, *u2, *got[1])
-}
-
-func TestGetValuesByIDs(t *testing.T) {
-	r, teardown := setup(t, testUsers...)
-	defer teardown()
-
-	u1 := testUserValues[1]
-	u2 := testUserValues[2]
-
-	got, err := r.GetValuesByIDs([]Identity{u1.ID, u2.ID})
-
-	assert.NoError(t, err)
-	assert.Equal(t, 2, len(got))
-	assert.Equal(t, u1, got[0])
-	assert.Equal(t, u2, got[1])
-}
-
-func TestDelete(t *testing.T) {
-	r, teardown := setup(t, testUsers...)
-	defer teardown()
-
-	u := testUsers[1]
-
-	err := r.Delete(u.ID)
-	assert.NoError(t, err)
-
-	got, err := r.GetAll()
-	assert.NoError(t, err)
-	assert.Equal(t, []*User{testUsers[0], testUsers[2]}, got)
-}
-
-func TestUpdate(t *testing.T) {
-	r, teardown := setup(t, testUsers...)
-	defer teardown()
-
-	updated := *testUsers[0]
-	updated.FirstName = "Bob"
-
-	err := r.Update(updated.ID, &updated)
-	assert.NoError(t, err)
-
-	got, err := r.GetByID(testUsers[0].ID)
-	assert.NoError(t, err)
-	assert.Equal(t, updated, *got)
-}
-
-func TestCount(t *testing.T) {
-	r, teardown := setup(t, testUsers...)
-	defer teardown()
-
-	got, err := r.Count()
-	assert.NoError(t, err)
-	assert.Equal(t, int64(len(testUsers)), got)
-}
-
-func TestCountByLastNameExists(t *testing.T) {
-	r, teardown := setup(t, testUsers...)
-	defer teardown()
-
-	got, err := r.CountByLastNameExists()
-	assert.NoError(t, err)
-	assert.Equal(t, map[string]int{
-		"with last_name":    2,
-		"without last_name": 1,
-	}, got)
-}
-
-func setup(t *testing.T, initData ...*User) (UserRepo, func()) {
-	db, err := sql.Open(driver, dsn)
-	assert.NoError(t, err)
-
-	r := UserRepo{
-		SQLCredo: sqlcredo.NewSQLCredo[User, Identity](db, driver, tableName, idColumn).
-			WithDebugFunc(func(query string, args ...any) {
-				fmt.Printf("Query: [%s]; Args: %+v\n", query, args)
-			}),
-	}
-
-	err = r.InitSchema(schema)
-	assert.NoError(t, err)
-
-	for _, u := range initData {
-		err := r.Create(u)
-		assert.NoError(t, err)
-	}
-
-	teardown := func() {
-		db.Close()
-	}
-
-	return r, teardown
-}
+	g.Context("custom methods", func() {
+		g.It("count by last name exists", func() {
+			o.Expect(repo.CountByLastNameExists()).To(o.Equal(map[string]int{
+				"with last_name":    2,
+				"without last_name": 1,
+			}))
+		})
+	})
+})
 
 func newTime(input string) time.Time {
 	result, err := time.Parse("2006-01-02", input)
@@ -279,6 +230,14 @@ func newTime(input string) time.Time {
 		panic(err)
 	}
 
+	return result
+}
+
+func wrapWithPtrs[T comparable](input []T) []*T {
+	result := make([]*T, 0, len(input))
+	for _, i := range input {
+		result = append(result, ptr[T](i))
+	}
 	return result
 }
 

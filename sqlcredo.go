@@ -10,8 +10,12 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
+var ErrRecordNotFound = errors.New("record not found")
+
 const (
-	_countQueryTemplate = "SELECT COUNT(*) FROM %s;"
+	_countQueryTemplate           = "SELECT COUNT(*) FROM %s;"
+	_truncateQueryTemplateSqlite3 = "DELETE FROM %s;"
+	_truncateQueryTemplateDefault = "TRUNCATE %s;"
 )
 
 type SQLExecutor interface {
@@ -84,6 +88,9 @@ type CRUD[T any, I comparable] interface {
 	Create(e *T) error
 	CreateContext(ctx context.Context, e *T) error
 
+	DeleteAll() error
+	DeleteAllContext(ctx context.Context) error
+
 	Delete(id I) error
 	DeleteContext(ctx context.Context, id I) error
 
@@ -107,21 +114,30 @@ type SQLCredo[T any, I comparable] interface {
 type queryBuilder func() (sql string, params []any, err error)
 
 type sqlCredo[T any, I comparable] struct {
-	db         *sqlx.DB
-	table      string
-	idColumn   string
-	countQuery string
-	debugFunc  DebugFunc
+	db            *sqlx.DB
+	table         string
+	idColumn      string
+	countQuery    string
+	truncateQuery string
+	debugFunc     DebugFunc
 }
 
 func NewSQLCredo[T any, I comparable](db *sql.DB, driver string, table string, idColumn string) SQLCredo[T, I] {
 	return &sqlCredo[T, I]{
-		db:         sqlx.NewDb(db, driver),
-		table:      table,
-		idColumn:   idColumn,
-		countQuery: fmt.Sprintf(_countQueryTemplate, table),
-		debugFunc:  func(sql string, args ...any) {},
+		db:            sqlx.NewDb(db, driver),
+		table:         table,
+		idColumn:      idColumn,
+		countQuery:    fmt.Sprintf(_countQueryTemplate, table),
+		truncateQuery: createTruncateQuery(driver, table),
+		debugFunc:     func(sql string, args ...any) {},
 	}
+}
+
+func createTruncateQuery(driver string, table string) string {
+	if driver == "sqlite3" {
+		return fmt.Sprintf(_truncateQueryTemplateSqlite3, table)
+	}
+	return fmt.Sprintf(_truncateQueryTemplateDefault, table)
 }
 
 func (r *sqlCredo[T, I]) WithDebugFunc(newDebugFunc DebugFunc) SQLCredo[T, I] {
@@ -205,7 +221,7 @@ func (r *sqlCredo[T, I]) GetByIDContext(ctx context.Context, id I) (*T, error) {
 
 	// TODO: check there is exact one entity in result
 	if len(entities) < 1 {
-		return nil, errors.New("entity not found")
+		return nil, errors.New("record not found")
 	}
 
 	return entities[0], nil
@@ -229,7 +245,7 @@ func (r *sqlCredo[T, I]) GetValueByIDContext(ctx context.Context, id I) (T, erro
 
 	// TODO: check there is exact one entity in result
 	if len(entities) < 1 {
-		return empty, errors.New("entity value not found")
+		return empty, ErrRecordNotFound
 	}
 
 	return entities[0], nil
@@ -281,6 +297,15 @@ func (r *sqlCredo[T, I]) CreateContext(ctx context.Context, e *T) error {
 		Prepared(true)
 
 	return r.execBuilderContext(ctx, builder.ToSQL)
+}
+
+func (r *sqlCredo[T, I]) DeleteAll() error {
+	return r.DeleteAllContext(context.Background())
+}
+
+func (r *sqlCredo[T, I]) DeleteAllContext(ctx context.Context) error {
+	_, err := r.ExecContext(ctx, r.truncateQuery)
+	return err
 }
 
 func (r *sqlCredo[T, I]) Delete(id I) error {
