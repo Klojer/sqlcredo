@@ -70,6 +70,7 @@ type CRUD[T any, I comparable] interface {
 	InitSchema(sql string) error
 	InitSchemaContext(ctx context.Context, sql string) error
 
+	// TODO: add paging result info
 	GetAll(opts ...PagingOpt) ([]*T, error)
 	GetAllContext(ctx context.Context, opts ...PagingOpt) ([]*T, error)
 	GetAllValues(opts ...PagingOpt) ([]T, error)
@@ -221,7 +222,7 @@ func (r *sqlCredo[T, I]) GetByIDContext(ctx context.Context, id I) (*T, error) {
 
 	// TODO: check there is exact one entity in result
 	if len(entities) < 1 {
-		return nil, errors.New("record not found")
+		return nil, ErrRecordNotFound
 	}
 
 	return entities[0], nil
