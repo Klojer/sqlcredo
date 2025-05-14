@@ -1,0 +1,18 @@
+repos:
+  - repo: local
+    hooks:
+      - id: go-mod-tidy
+        name: go-mod-tidy
+        entry: bash -c "go mod tidy"
+        language: system
+        always_run: true
+      - id: golangci-lint
+        name: golangci-lint
+        entry: bash -c "golangci-lint run"
+        language: system
+        always_run: true
+      - id: go-tests
+        name: go-tests
+        entry: bash -c "go test ./..."
+        language: system
+        always_run: true
