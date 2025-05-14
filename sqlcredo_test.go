@@ -231,7 +231,7 @@ func newTime(input string) time.Time {
 func wrapWithPtrs[T comparable](input []T) []*T {
 	result := make([]*T, 0, len(input))
 	for _, i := range input {
-		result = append(result, ptr[T](i))
+		result = append(result, ptr(i))
 	}
 	return result
 }
