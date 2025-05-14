@@ -19,16 +19,12 @@ const (
 )
 
 type SQLExecutor interface {
-	SelectOne(dest any, query string, args ...any) error
-	SelectOneContext(ctx context.Context, dest any, query string, args ...any) error
+	SelectOne(ctx context.Context, dest any, query string, args ...any) error
 
-	SelectMany(dest any, query string, args ...any) error
-	SelectManyContext(ctx context.Context, dest any, query string, args ...any) error
+	SelectMany(ctx context.Context, dest any, query string, args ...any) error
 
-	Exec(query string, args ...any) (sql.Result, error)
-	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+	Exec(ctx context.Context, query string, args ...any) (sql.Result, error)
 
-	Begin() (*sql.Tx, error)
 	BeginTx(ctx context.Context, opts *sql.TxOptions) (*sql.Tx, error)
 }
 
@@ -67,39 +63,24 @@ func WithOrderColumnAndDirection(orderColumn string, desc bool) PagingOpt {
 }
 
 type CRUD[T any, I comparable] interface {
-	InitSchema(sql string) error
-	InitSchemaContext(ctx context.Context, sql string) error
+	InitSchema(ctx context.Context, sql string) error
 
 	// TODO: add paging result info
-	GetAll(opts ...PagingOpt) ([]*T, error)
-	GetAllContext(ctx context.Context, opts ...PagingOpt) ([]*T, error)
-	GetAllValues(opts ...PagingOpt) ([]T, error)
-	GetAllValuesContext(ctx context.Context, opts ...PagingOpt) ([]T, error)
+	GetAll(ctx context.Context, opts ...PagingOpt) ([]T, error)
 
-	GetByID(id I) (*T, error)
-	GetByIDContext(ctx context.Context, id I) (*T, error)
-	GetValueByID(id I) (T, error)
-	GetValueByIDContext(ctx context.Context, id I) (T, error)
+	GetByID(ctx context.Context, id I) (T, error)
 
-	GetByIDs(ids []I) ([]*T, error)
-	GetByIDsContext(ctx context.Context, ids []I) ([]*T, error)
-	GetValuesByIDs(ids []I) ([]T, error)
-	GetValuesByIDsContext(ctx context.Context, ids []I) ([]T, error)
+	GetByIDs(ctx context.Context, ids []I) ([]T, error)
 
-	Create(e *T) error
-	CreateContext(ctx context.Context, e *T) error
+	Create(ctx context.Context, e *T) error
 
-	DeleteAll() error
-	DeleteAllContext(ctx context.Context) error
+	DeleteAll(ctx context.Context) error
 
-	Delete(id I) error
-	DeleteContext(ctx context.Context, id I) error
+	Delete(ctx context.Context, id I) error
 
-	Update(id I, e *T) error
-	UpdateContext(ctx context.Context, id I, e *T) error
+	Update(ctx context.Context, id I, e *T) error
 
-	Count() (int64, error)
-	CountContext(ctx context.Context) (int64, error)
+	Count(ctx context.Context) (int64, error)
 }
 
 type DebugFunc func(sql string, args ...any)
@@ -150,11 +131,7 @@ func (r *sqlCredo[T, I]) GetDebugFunc() DebugFunc {
 	return r.debugFunc
 }
 
-func (r *sqlCredo[T, I]) InitSchema(sql string) error {
-	return r.InitSchemaContext(context.Background(), sql)
-}
-
-func (r *sqlCredo[T, I]) InitSchemaContext(ctx context.Context, sql string) error {
+func (r *sqlCredo[T, I]) InitSchema(ctx context.Context, sql string) error {
 	_, err := r.db.ExecContext(ctx, sql)
 	if err != nil {
 		return fmt.Errorf("failed to execute query: %w", err)
@@ -162,23 +139,11 @@ func (r *sqlCredo[T, I]) InitSchemaContext(ctx context.Context, sql string) erro
 	return nil
 }
 
-func (r *sqlCredo[T, I]) GetAll(opts ...PagingOpt) ([]*T, error) {
-	return r.GetAllContext(context.Background(), opts...)
+func (r *sqlCredo[T, I]) GetAll(ctx context.Context, opts ...PagingOpt) ([]T, error) {
+	return r.selectValuesBuilderContext(ctx, r.getAllQueryBuilder(opts...))
 }
 
-func (r *sqlCredo[T, I]) GetAllContext(ctx context.Context, opts ...PagingOpt) ([]*T, error) {
-	return r.selectBuilderContext(ctx, r.getAllQueryBuilder(ctx, opts...))
-}
-
-func (r *sqlCredo[T, I]) GetAllValues(opts ...PagingOpt) ([]T, error) {
-	return r.GetAllValuesContext(context.Background(), opts...)
-}
-
-func (r *sqlCredo[T, I]) GetAllValuesContext(ctx context.Context, opts ...PagingOpt) ([]T, error) {
-	return r.selectValuesBuilderContext(ctx, r.getAllQueryBuilder(ctx, opts...))
-}
-
-func (r *sqlCredo[T, I]) getAllQueryBuilder(ctx context.Context, opts ...PagingOpt) queryBuilder {
+func (r *sqlCredo[T, I]) getAllQueryBuilder(opts ...PagingOpt) queryBuilder {
 	params := &pagingParams{}
 
 	for _, o := range opts {
@@ -206,33 +171,7 @@ func (r *sqlCredo[T, I]) getAllQueryBuilder(ctx context.Context, opts ...PagingO
 	return builder.ToSQL
 }
 
-func (r *sqlCredo[T, I]) GetByID(id I) (*T, error) {
-	return r.GetByIDContext(context.Background(), id)
-}
-
-func (r *sqlCredo[T, I]) GetByIDContext(ctx context.Context, id I) (*T, error) {
-	builder := goqu.From(r.table).
-		Where(goqu.I(r.idColumn).Eq(id)).
-		Prepared(true)
-
-	entities, err := r.selectBuilderContext(context.Background(), builder.ToSQL)
-	if err != nil {
-		return nil, fmt.Errorf("failed to select entities: %w", err)
-	}
-
-	// TODO: check there is exact one entity in result
-	if len(entities) < 1 {
-		return nil, ErrRecordNotFound
-	}
-
-	return entities[0], nil
-}
-
-func (r *sqlCredo[T, I]) GetValueByID(id I) (T, error) {
-	return r.GetValueByIDContext(context.Background(), id)
-}
-
-func (r *sqlCredo[T, I]) GetValueByIDContext(ctx context.Context, id I) (T, error) {
+func (r *sqlCredo[T, I]) GetByID(ctx context.Context, id I) (T, error) {
 	builder := goqu.From(r.table).
 		Where(goqu.I(r.idColumn).Eq(id)).
 		Prepared(true)
@@ -252,10 +191,6 @@ func (r *sqlCredo[T, I]) GetValueByIDContext(ctx context.Context, id I) (T, erro
 	return entities[0], nil
 }
 
-func (r *sqlCredo[T, I]) GetByIDs(ids []I) ([]*T, error) {
-	return r.GetByIDsContext(context.Background(), ids)
-}
-
 func (r *sqlCredo[T, I]) GetByIDsContext(ctx context.Context, ids []I) ([]*T, error) {
 	builder := goqu.From(r.table).
 		Where(goqu.I(r.idColumn).In(ids)).
@@ -270,11 +205,7 @@ func (r *sqlCredo[T, I]) GetByIDsContext(ctx context.Context, ids []I) ([]*T, er
 	return entities, nil
 }
 
-func (r *sqlCredo[T, I]) GetValuesByIDs(ids []I) ([]T, error) {
-	return r.GetValuesByIDsContext(context.Background(), ids)
-}
-
-func (r *sqlCredo[T, I]) GetValuesByIDsContext(ctx context.Context, ids []I) ([]T, error) {
+func (r *sqlCredo[T, I]) GetByIDs(ctx context.Context, ids []I) ([]T, error) {
 	builder := goqu.From(r.table).
 		Where(goqu.I(r.idColumn).In(ids)).
 		Order(goqu.I(r.idColumn).Asc()).
@@ -288,11 +219,7 @@ func (r *sqlCredo[T, I]) GetValuesByIDsContext(ctx context.Context, ids []I) ([]
 	return entities, nil
 }
 
-func (r *sqlCredo[T, I]) Create(e *T) error {
-	return r.CreateContext(context.Background(), e)
-}
-
-func (r *sqlCredo[T, I]) CreateContext(ctx context.Context, e *T) error {
+func (r *sqlCredo[T, I]) Create(ctx context.Context, e *T) error {
 	builder := goqu.Insert(r.table).
 		Rows(e).
 		Prepared(true)
@@ -300,20 +227,12 @@ func (r *sqlCredo[T, I]) CreateContext(ctx context.Context, e *T) error {
 	return r.execBuilderContext(ctx, builder.ToSQL)
 }
 
-func (r *sqlCredo[T, I]) DeleteAll() error {
-	return r.DeleteAllContext(context.Background())
-}
-
-func (r *sqlCredo[T, I]) DeleteAllContext(ctx context.Context) error {
-	_, err := r.ExecContext(ctx, r.truncateQuery)
+func (r *sqlCredo[T, I]) DeleteAll(ctx context.Context) error {
+	_, err := r.Exec(ctx, r.truncateQuery)
 	return err
 }
 
-func (r *sqlCredo[T, I]) Delete(id I) error {
-	return r.DeleteContext(context.Background(), id)
-}
-
-func (r *sqlCredo[T, I]) DeleteContext(ctx context.Context, id I) error {
+func (r *sqlCredo[T, I]) Delete(ctx context.Context, id I) error {
 	builder := goqu.Delete(r.table).
 		Where(goqu.I(r.idColumn).Eq(id)).
 		Prepared(true)
@@ -321,11 +240,7 @@ func (r *sqlCredo[T, I]) DeleteContext(ctx context.Context, id I) error {
 	return r.execBuilderContext(ctx, builder.ToSQL)
 }
 
-func (r *sqlCredo[T, I]) Update(id I, e *T) error {
-	return r.UpdateContext(context.Background(), id, e)
-}
-
-func (r *sqlCredo[T, I]) UpdateContext(ctx context.Context, id I, e *T) error {
+func (r *sqlCredo[T, I]) Update(ctx context.Context, id I, e *T) error {
 	builder := goqu.Update(r.table).
 		Set(*e).
 		Where(goqu.I(r.idColumn).Eq(id)).
@@ -334,13 +249,9 @@ func (r *sqlCredo[T, I]) UpdateContext(ctx context.Context, id I, e *T) error {
 	return r.execBuilderContext(ctx, builder.ToSQL)
 }
 
-func (r *sqlCredo[T, I]) Count() (int64, error) {
-	return r.CountContext(context.Background())
-}
-
-func (r *sqlCredo[T, I]) CountContext(ctx context.Context) (int64, error) {
+func (r *sqlCredo[T, I]) Count(ctx context.Context) (int64, error) {
 	var res int64
-	if err := r.SelectOneContext(ctx, &res, r.countQuery); err != nil {
+	if err := r.SelectOne(ctx, &res, r.countQuery); err != nil {
 		return 0, fmt.Errorf("failed to count entities: %w", err)
 	}
 
@@ -353,7 +264,7 @@ func (r *sqlCredo[T, I]) execBuilderContext(ctx context.Context, builder queryBu
 		return fmt.Errorf("failed to create sql query: %w", err)
 	}
 
-	if _, err := r.ExecContext(ctx, sql, args...); err != nil {
+	if _, err := r.Exec(ctx, sql, args...); err != nil {
 		return fmt.Errorf("failed to execute sql query: %w", err)
 	}
 
@@ -367,7 +278,7 @@ func (r *sqlCredo[T, I]) selectBuilderContext(ctx context.Context, builder query
 	}
 
 	var entities []*T
-	if err = r.SelectManyContext(ctx, &entities, sql, args...); err != nil {
+	if err = r.SelectMany(ctx, &entities, sql, args...); err != nil {
 		return nil, fmt.Errorf("failed to load enitites: %w", err)
 	}
 
@@ -381,18 +292,14 @@ func (r *sqlCredo[T, I]) selectValuesBuilderContext(ctx context.Context, builder
 	}
 
 	var entities []T
-	if err = r.SelectManyContext(ctx, &entities, sql, args...); err != nil {
+	if err = r.SelectMany(ctx, &entities, sql, args...); err != nil {
 		return nil, fmt.Errorf("failed to load enitity values: %w", err)
 	}
 
 	return entities, nil
 }
 
-func (r *sqlCredo[T, I]) SelectOne(dest any, query string, args ...any) error {
-	return r.SelectOneContext(context.Background(), dest, query, args...)
-}
-
-func (r *sqlCredo[T, I]) SelectOneContext(ctx context.Context, dest any, query string, args ...any) error {
+func (r *sqlCredo[T, I]) SelectOne(ctx context.Context, dest any, query string, args ...any) error {
 	r.debugFunc(query, args...)
 
 	if err := r.db.GetContext(ctx, dest, query, args...); err != nil {
@@ -402,11 +309,7 @@ func (r *sqlCredo[T, I]) SelectOneContext(ctx context.Context, dest any, query s
 	return nil
 }
 
-func (r *sqlCredo[T, I]) SelectMany(dest any, query string, args ...any) error {
-	return r.SelectManyContext(context.Background(), dest, query, args...)
-}
-
-func (r *sqlCredo[T, I]) SelectManyContext(ctx context.Context, dest any, query string, args ...any) error {
+func (r *sqlCredo[T, I]) SelectMany(ctx context.Context, dest any, query string, args ...any) error {
 	r.debugFunc(query, args...)
 
 	if err := r.db.SelectContext(ctx, dest, query, args...); err != nil {
@@ -416,11 +319,7 @@ func (r *sqlCredo[T, I]) SelectManyContext(ctx context.Context, dest any, query 
 	return nil
 }
 
-func (r *sqlCredo[T, I]) Exec(query string, args ...any) (sql.Result, error) {
-	return r.ExecContext(context.Background(), query, args...)
-}
-
-func (r *sqlCredo[T, I]) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
+func (r *sqlCredo[T, I]) Exec(ctx context.Context, query string, args ...any) (sql.Result, error) {
 	r.debugFunc(query, args...)
 
 	res, err := r.db.ExecContext(ctx, query, args...)
@@ -429,10 +328,6 @@ func (r *sqlCredo[T, I]) ExecContext(ctx context.Context, query string, args ...
 	}
 
 	return res, nil
-}
-
-func (r *sqlCredo[T, I]) Begin() (*sql.Tx, error) {
-	return r.db.Begin()
 }
 
 func (r *sqlCredo[T, I]) BeginTx(ctx context.Context, opts *sql.TxOptions) (*sql.Tx, error) {

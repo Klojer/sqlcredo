@@ -1,6 +1,7 @@
 package sqlcredo_test
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -64,9 +65,9 @@ type CountByLastNameExistsCategory struct {
 	Count int    `db:"cnt"`
 }
 
-func (r *UserRepo) CountByLastNameExists() (map[string]int, error) {
+func (r *UserRepo) CountByLastNameExists(ctx context.Context) (map[string]int, error) {
 	var counters []CountByLastNameExistsCategory
-	if err := r.SelectMany(&counters, CountByLastNameExistsQuery); err != nil {
+	if err := r.SelectMany(ctx, &counters, CountByLastNameExistsQuery); err != nil {
 		return nil, fmt.Errorf("failed to select entities: %w", err)
 	}
 
@@ -84,6 +85,7 @@ var debugFunc = func(query string, args ...any) {
 
 var _ = g.Describe("UserRepo", func() {
 	var repo UserRepo
+	ctx := context.Background()
 
 	g.BeforeEach(func() {
 		repo = UserRepo{
@@ -91,19 +93,19 @@ var _ = g.Describe("UserRepo", func() {
 				WithDebugFunc(debugFunc),
 		}
 
-		o.Expect(repo.InitSchema(schema)).NotTo(o.HaveOccurred())
+		o.Expect(repo.InitSchema(ctx, schema)).NotTo(o.HaveOccurred())
 
 		for _, u := range testUserPtrs {
-			o.Expect(repo.Create(u)).NotTo(o.HaveOccurred())
+			o.Expect(repo.Create(ctx, u)).NotTo(o.HaveOccurred())
 		}
 
-		cnt, err := repo.Count()
+		cnt, err := repo.Count(ctx)
 		o.Expect(err).NotTo(o.HaveOccurred())
 		o.Expect(int(cnt)).To(o.Equal(len(testUserPtrs)))
 	})
 
 	g.AfterEach(func() {
-		repo.DeleteAll()
+		repo.DeleteAll(ctx)
 	})
 
 	g.Context("base methods", func() {
@@ -112,79 +114,59 @@ var _ = g.Describe("UserRepo", func() {
 
 			g.JustBeforeEach(func() {
 				user = &User{"u4", "Gordon", ptr("Gibs"), newTime("1931-09-03")}
-				o.Expect(repo.Create(user)).NotTo(o.HaveOccurred())
+				o.Expect(repo.Create(ctx, user)).NotTo(o.HaveOccurred())
 			})
 
 			g.It("should be accessable by id", func() {
-				got, err := repo.GetByID(user.ID)
+				got, err := repo.GetByID(ctx, user.ID)
 				o.Expect(err).NotTo(o.HaveOccurred())
-				o.Expect(*got).To(o.Equal(*user))
+				o.Expect(got).To(o.Equal(*user))
 			})
 		})
 
 		g.When("get all users", func() {
-			g.It("should contain all records", func() {
-				o.Expect(repo.GetAll()).To(o.Equal(testUserPtrs))
-			})
-
 			g.It("should contain all record values", func() {
-				o.Expect(repo.GetAllValues()).To(o.Equal(testUserValues))
+				o.Expect(repo.GetAll(ctx)).To(o.Equal(testUserValues))
 			})
 
 			g.When("get first page", func() {
 				g.It("should contain first page records", func() {
-					o.Expect(repo.GetAllValues(sc.WithOffset(0), sc.WithLimit(2), sc.WithOrderColumn("id"))).
+					o.Expect(repo.GetAll(ctx, sc.WithOffset(0), sc.WithLimit(2), sc.WithOrderColumn("id"))).
 						To(o.Equal(testUserValues[0:2]))
 				})
 			})
 
 			g.When("get second page", func() {
 				g.It("should contain second page records", func() {
-					o.Expect(repo.GetAllValues(sc.WithOffset(2), sc.WithLimit(2), sc.WithOrderColumn("id"))).
+					o.Expect(repo.GetAll(ctx, sc.WithOffset(2), sc.WithLimit(2), sc.WithOrderColumn("id"))).
 						To(o.Equal(testUserValues[2:]))
 				})
 			})
 		})
 
 		g.When("get user by id", func() {
-			g.Context("to pointer", func() {
-				g.It("should contain pointer to user", func() {
-					o.Expect(repo.GetByID(testUserPtrs[1].ID)).To(o.Equal(testUserPtrs[1]))
-				})
-			})
-
-			g.Context("to value", func() {
-				g.It("should contain value of user", func() {
-					o.Expect(repo.GetValueByID(testUserValues[2].ID)).To(o.Equal(testUserValues[2]))
-				})
+			g.It("should contain value of user", func() {
+				o.Expect(repo.GetByID(ctx, testUserValues[2].ID)).
+					To(o.Equal(testUserValues[2]))
 			})
 		})
 
 		g.When("get users by ids", func() {
-			g.Context("to pointers", func() {
-				g.It("should contain slice of pointers", func() {
-					o.Expect(repo.GetByIDs([]Identity{testUserPtrs[1].ID, testUserPtrs[2].ID})).
-						To(o.Equal([]*User{testUserPtrs[1], testUserPtrs[2]}))
-				})
-			})
-
-			g.Context("to values", func() {
-				g.It("should contain slice of values", func() {
-					o.Expect(repo.GetValuesByIDs([]Identity{testUserPtrs[1].ID, testUserPtrs[2].ID})).
-						To(o.Equal([]User{testUserValues[1], testUserValues[2]}))
-				})
+			g.It("should contain slice of values", func() {
+				o.Expect(repo.GetByIDs(ctx, []Identity{testUserPtrs[1].ID, testUserPtrs[2].ID})).
+					To(o.Equal([]User{testUserValues[1], testUserValues[2]}))
 			})
 		})
 
 		g.When("delete user", func() {
 			g.JustBeforeEach(func() {
-				o.Expect(repo.Delete(testUserValues[1].ID)).NotTo(o.HaveOccurred())
+				o.Expect(repo.Delete(ctx, testUserValues[1].ID)).NotTo(o.HaveOccurred())
 			})
 
 			g.It("should be absent in database", func() {
-				got, err := repo.GetByID(testUserValues[1].ID)
+				got, err := repo.GetByID(ctx, testUserValues[1].ID)
 				o.Expect(err).To(o.MatchError(sc.ErrRecordNotFound))
-				o.Expect(got).To(o.BeNil())
+				o.Expect(got).To(o.Equal(User{}))
 			})
 		})
 
@@ -195,11 +177,11 @@ var _ = g.Describe("UserRepo", func() {
 				updated = testUserPtrs[1]
 				updated.FirstName = updated.FirstName + "_updated"
 
-				o.Expect(repo.Update(updated.ID, updated)).NotTo(o.HaveOccurred())
+				o.Expect(repo.Update(ctx, updated.ID, updated)).NotTo(o.HaveOccurred())
 			})
 
 			g.It("should be updated in database", func() {
-				got, err := repo.GetValueByID(testUserValues[1].ID)
+				got, err := repo.GetByID(ctx, testUserValues[1].ID)
 				o.Expect(err).NotTo(o.HaveOccurred())
 				o.Expect(got).To(o.Equal(*updated))
 			})
@@ -207,7 +189,7 @@ var _ = g.Describe("UserRepo", func() {
 
 		g.When("count users", func() {
 			g.It("should contain actual number of users", func() {
-				got, err := repo.Count()
+				got, err := repo.Count(ctx)
 				o.Expect(err).NotTo(o.HaveOccurred())
 				o.Expect(int(got)).To(o.Equal(len(testUserPtrs)))
 			})
@@ -216,10 +198,11 @@ var _ = g.Describe("UserRepo", func() {
 
 	g.Context("custom methods", func() {
 		g.It("count by last name exists", func() {
-			o.Expect(repo.CountByLastNameExists()).To(o.Equal(map[string]int{
-				"with last_name":    2,
-				"without last_name": 1,
-			}))
+			o.Expect(repo.CountByLastNameExists(ctx)).
+				To(o.Equal(map[string]int{
+					"with last_name":    2,
+					"without last_name": 1,
+				}))
 		})
 	})
 })
