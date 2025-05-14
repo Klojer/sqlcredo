@@ -131,15 +131,27 @@ var _ = g.Describe("UserRepo", func() {
 
 			g.When("get first page", func() {
 				g.It("should contain first page records", func() {
-					o.Expect(repo.GetAll(ctx, sc.WithOffset(0), sc.WithLimit(2), sc.WithOrderColumn("id"))).
-						To(o.Equal(testUserValues[0:2]))
+					o.Expect(repo.GetPage(ctx, sc.WithOffset(0), sc.WithLimit(2), sc.WithOrderColumn("id"))).
+						To(o.Equal(sc.Page[User]{
+							Number:     0,
+							Size:       2,
+							Total:      3,
+							TotalPages: 2,
+							Content:    testUserValues[0:2],
+						}))
 				})
 			})
 
 			g.When("get second page", func() {
 				g.It("should contain second page records", func() {
-					o.Expect(repo.GetAll(ctx, sc.WithOffset(2), sc.WithLimit(2), sc.WithOrderColumn("id"))).
-						To(o.Equal(testUserValues[2:]))
+					o.Expect(repo.GetPage(ctx, sc.WithOffset(2), sc.WithLimit(2), sc.WithOrderColumn("id"))).
+						To(o.Equal(sc.Page[User]{
+							Number:     1,
+							Size:       1,
+							Total:      3,
+							TotalPages: 2,
+							Content:    testUserValues[2:],
+						}))
 				})
 			})
 		})

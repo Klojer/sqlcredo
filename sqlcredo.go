@@ -13,9 +13,9 @@ import (
 var ErrRecordNotFound = errors.New("record not found")
 
 const (
-	_countQueryTemplate           = "SELECT COUNT(*) FROM %s;"
-	_truncateQueryTemplateSqlite3 = "DELETE FROM %s;"
-	_truncateQueryTemplateDefault = "TRUNCATE %s;"
+	countQueryTemplate           = "SELECT COUNT(*) FROM %s;"
+	truncateQueryTemplateSqlite3 = "DELETE FROM %s;"
+	truncateQueryTemplateDefault = "TRUNCATE %s;"
 )
 
 type SQLExecutor interface {
@@ -29,44 +29,63 @@ type SQLExecutor interface {
 }
 
 type pagingParams struct {
-	Offset      *uint
-	Limit       *uint
-	OrderColumn *string
+	Offset      uint
+	Limit       uint
+	OrderColumn string
 	OrderDesc   bool
+}
+
+func newPagingParams(opts ...PagingOpt) pagingParams {
+	params := pagingParams{}
+
+	for _, o := range opts {
+		o(&params)
+	}
+
+	return params
 }
 
 type PagingOpt func(*pagingParams)
 
 func WithOffset(offset uint) PagingOpt {
 	return func(p *pagingParams) {
-		p.Offset = &offset
+		p.Offset = offset
 	}
 }
 
 func WithLimit(limit uint) PagingOpt {
 	return func(p *pagingParams) {
-		p.Limit = &limit
+		p.Limit = limit
 	}
 }
 
 func WithOrderColumn(orderColumn string) PagingOpt {
 	return func(p *pagingParams) {
-		p.OrderColumn = &orderColumn
+		p.OrderColumn = orderColumn
 	}
 }
 
 func WithOrderColumnAndDirection(orderColumn string, desc bool) PagingOpt {
 	return func(p *pagingParams) {
-		p.OrderColumn = &orderColumn
+		p.OrderColumn = orderColumn
 		p.OrderDesc = desc
 	}
+}
+
+type Page[T any] struct {
+	Number     uint
+	Size       uint
+	Total      uint64
+	TotalPages uint
+	Content    []T
 }
 
 type CRUD[T any, I comparable] interface {
 	InitSchema(ctx context.Context, sql string) error
 
-	// TODO: add paging result info
-	GetAll(ctx context.Context, opts ...PagingOpt) ([]T, error)
+	GetAll(ctx context.Context) ([]T, error)
+
+	GetPage(ctx context.Context, opts ...PagingOpt) (Page[T], error)
 
 	GetByID(ctx context.Context, id I) (T, error)
 
@@ -80,7 +99,7 @@ type CRUD[T any, I comparable] interface {
 
 	Update(ctx context.Context, id I, e *T) error
 
-	Count(ctx context.Context) (int64, error)
+	Count(ctx context.Context) (uint64, error)
 }
 
 type DebugFunc func(sql string, args ...any)
@@ -102,6 +121,7 @@ type sqlCredo[T any, I comparable] struct {
 	countQuery    string
 	truncateQuery string
 	debugFunc     DebugFunc
+	emptyPage     Page[T]
 }
 
 func NewSQLCredo[T any, I comparable](db *sql.DB, driver string, table string, idColumn string) SQLCredo[T, I] {
@@ -109,17 +129,18 @@ func NewSQLCredo[T any, I comparable](db *sql.DB, driver string, table string, i
 		db:            sqlx.NewDb(db, driver),
 		table:         table,
 		idColumn:      idColumn,
-		countQuery:    fmt.Sprintf(_countQueryTemplate, table),
+		countQuery:    fmt.Sprintf(countQueryTemplate, table),
 		truncateQuery: createTruncateQuery(driver, table),
 		debugFunc:     func(sql string, args ...any) {},
+		emptyPage:     createEmptyPage[T](),
 	}
 }
 
 func createTruncateQuery(driver string, table string) string {
 	if driver == "sqlite3" {
-		return fmt.Sprintf(_truncateQueryTemplateSqlite3, table)
+		return fmt.Sprintf(truncateQueryTemplateSqlite3, table)
 	}
-	return fmt.Sprintf(_truncateQueryTemplateDefault, table)
+	return fmt.Sprintf(truncateQueryTemplateDefault, table)
 }
 
 func (r *sqlCredo[T, I]) WithDebugFunc(newDebugFunc DebugFunc) SQLCredo[T, I] {
@@ -139,33 +160,57 @@ func (r *sqlCredo[T, I]) InitSchema(ctx context.Context, sql string) error {
 	return nil
 }
 
-func (r *sqlCredo[T, I]) GetAll(ctx context.Context, opts ...PagingOpt) ([]T, error) {
-	return r.selectValuesBuilderContext(ctx, r.getAllQueryBuilder(opts...))
+func (r *sqlCredo[T, I]) GetAll(ctx context.Context) ([]T, error) {
+	builder := goqu.From(r.table).Prepared(true)
+	return r.selectValuesBuilderContext(ctx, builder.ToSQL)
 }
 
-func (r *sqlCredo[T, I]) getAllQueryBuilder(opts ...PagingOpt) queryBuilder {
-	params := &pagingParams{}
+func (r *sqlCredo[T, I]) GetPage(ctx context.Context, opts ...PagingOpt) (Page[T], error) {
+	params := newPagingParams(opts...)
 
-	for _, o := range opts {
-		o(params)
+	pageRecords, err := r.selectMany(ctx, params)
+	if err != nil {
+		return r.emptyPage, fmt.Errorf("unable to get page items: %w", err)
+	}
+	totalRecords, err := r.Count(ctx)
+	if err != nil {
+		return r.emptyPage, fmt.Errorf("unable to count all items: %w", err)
 	}
 
+	if len(pageRecords) == 0 {
+		return r.emptyPage, nil
+	}
+
+	pageNumber := params.Offset / params.Limit
+
+	totalPages := uint(totalRecords) / params.Limit
+	if uint(totalRecords)%params.Limit != 0 {
+		totalPages += 1
+	}
+
+	return Page[T]{
+		Number:     pageNumber,
+		Size:       uint(len(pageRecords)),
+		Total:      totalRecords,
+		TotalPages: totalPages,
+		Content:    pageRecords,
+	}, nil
+}
+
+func (r *sqlCredo[T, I]) selectMany(ctx context.Context, paging pagingParams) ([]T, error) {
+	return r.selectValuesBuilderContext(ctx, r.selectManyQueryBuilder(paging))
+}
+
+func (r *sqlCredo[T, I]) selectManyQueryBuilder(params pagingParams) queryBuilder {
 	builder := goqu.From(r.table).Prepared(true)
 
-	if params.Offset != nil {
-		builder = builder.Offset(*params.Offset)
-	}
+	builder = builder.Offset(params.Offset)
+	builder = builder.Limit(params.Limit)
 
-	if params.Limit != nil {
-		builder = builder.Limit(*params.Limit)
-	}
-
-	if params.OrderColumn != nil {
-		if params.OrderDesc {
-			builder = builder.Order(goqu.I(*params.OrderColumn).Desc())
-		} else {
-			builder = builder.Order(goqu.I(*params.OrderColumn).Asc())
-		}
+	if params.OrderDesc {
+		builder = builder.Order(goqu.I(params.OrderColumn).Desc())
+	} else {
+		builder = builder.Order(goqu.I(params.OrderColumn).Asc())
 	}
 
 	return builder.ToSQL
@@ -249,8 +294,8 @@ func (r *sqlCredo[T, I]) Update(ctx context.Context, id I, e *T) error {
 	return r.execBuilderContext(ctx, builder.ToSQL)
 }
 
-func (r *sqlCredo[T, I]) Count(ctx context.Context) (int64, error) {
-	var res int64
+func (r *sqlCredo[T, I]) Count(ctx context.Context) (uint64, error) {
+	var res uint64
 	if err := r.SelectOne(ctx, &res, r.countQuery); err != nil {
 		return 0, fmt.Errorf("failed to count entities: %w", err)
 	}
@@ -332,4 +377,14 @@ func (r *sqlCredo[T, I]) Exec(ctx context.Context, query string, args ...any) (s
 
 func (r *sqlCredo[T, I]) BeginTx(ctx context.Context, opts *sql.TxOptions) (*sql.Tx, error) {
 	return r.db.BeginTx(ctx, opts)
+}
+
+func createEmptyPage[T any]() Page[T] {
+	return Page[T]{
+		Number:     0,
+		Size:       0,
+		Total:      0,
+		TotalPages: 0,
+		Content:    nil,
+	}
 }
