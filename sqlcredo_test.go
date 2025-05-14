@@ -105,7 +105,9 @@ var _ = g.Describe("UserRepo", func() {
 	})
 
 	g.AfterEach(func() {
-		repo.DeleteAll(ctx)
+		if err := repo.DeleteAll(ctx); err != nil {
+			g.GinkgoLogr.Error(err, "unable to clear after case")
+		}
 	})
 
 	g.Context("base methods", func() {
