@@ -45,6 +45,8 @@ CREATE TABLE IF NOT EXISTS user (
 		{"u0", "John", ptr("Smith"), newTime("1989-03-05")},
 		{"u1", "Carl", nil, newTime("1973-01-09")},
 		{"u2", "Ann", ptr("Stone"), newTime("1985-08-01")},
+		{"u3", "Ann", ptr("Brick"), newTime("1987-03-02")},
+		{"u4", "Antony", nil, newTime("1987-03-02")},
 	}
 
 	testUserPtrs = wrapWithPtrs(testUserValues)
@@ -115,7 +117,7 @@ var _ = g.Describe("UserRepo", func() {
 			var user *User
 
 			g.JustBeforeEach(func() {
-				user = &User{"u4", "Gordon", ptr("Gibs"), newTime("1931-09-03")}
+				user = &User{"u99", "Gordon", ptr("Gibs"), newTime("1931-09-03")}
 				o.Expect(repo.Create(ctx, user)).NotTo(o.HaveOccurred())
 			})
 
@@ -130,15 +132,24 @@ var _ = g.Describe("UserRepo", func() {
 			g.It("should contain all record values", func() {
 				o.Expect(repo.GetAll(ctx)).To(o.Equal(testUserValues))
 			})
+		})
 
+		g.When("validate page request", func() {
+			g.It("page size can't be 0", func() {
+				_, err := repo.GetPage(ctx, sc.WithPageSize(0))
+				o.Expect(err).To(o.MatchError(sc.ErrInvalidPageSize))
+			})
+		})
+
+		g.When("get page of users", func() {
 			g.When("get first page", func() {
 				g.It("should contain first page records", func() {
-					o.Expect(repo.GetPage(ctx, sc.WithOffset(0), sc.WithLimit(2), sc.WithOrderColumn("id"))).
+					o.Expect(repo.GetPage(ctx, sc.WithPageNumber(0), sc.WithPageSize(2), sc.WithSort("id"))).
 						To(o.Equal(sc.Page[User]{
 							Number:     0,
 							Size:       2,
-							Total:      3,
-							TotalPages: 2,
+							Total:      5,
+							TotalPages: 3,
 							Content:    testUserValues[0:2],
 						}))
 				})
@@ -146,13 +157,13 @@ var _ = g.Describe("UserRepo", func() {
 
 			g.When("get second page", func() {
 				g.It("should contain second page records", func() {
-					o.Expect(repo.GetPage(ctx, sc.WithOffset(2), sc.WithLimit(2), sc.WithOrderColumn("id"))).
+					o.Expect(repo.GetPage(ctx, sc.WithPageNumber(1), sc.WithPageSize(2), sc.WithSort("id"))).
 						To(o.Equal(sc.Page[User]{
 							Number:     1,
-							Size:       1,
-							Total:      3,
-							TotalPages: 2,
-							Content:    testUserValues[2:],
+							Size:       2,
+							Total:      5,
+							TotalPages: 3,
+							Content:    testUserValues[2:4],
 						}))
 				})
 			})
@@ -214,8 +225,8 @@ var _ = g.Describe("UserRepo", func() {
 		g.It("count by last name exists", func() {
 			o.Expect(repo.CountByLastNameExists(ctx)).
 				To(o.Equal(map[string]int{
-					"with last_name":    2,
-					"without last_name": 1,
+					"with last_name":    3,
+					"without last_name": 2,
 				}))
 		})
 	})

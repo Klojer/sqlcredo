@@ -5,12 +5,16 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"math"
 
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jmoiron/sqlx"
 )
 
-var ErrRecordNotFound = errors.New("record not found")
+var (
+	ErrRecordNotFound  = errors.New("record not found")
+	ErrInvalidPageSize = errors.New("invalid page size")
+)
 
 const (
 	countQueryTemplate           = "SELECT COUNT(*) FROM %s;"
@@ -28,47 +32,65 @@ type SQLExecutor interface {
 	BeginTx(ctx context.Context, opts *sql.TxOptions) (*sql.Tx, error)
 }
 
-type pagingParams struct {
-	Offset      uint
-	Limit       uint
-	OrderColumn string
-	OrderDesc   bool
+type pageRequest struct {
+	PageNumber uint
+	PageSize   uint
+	SortBy     string
+	SortDesc   bool
 }
 
-func newPagingParams(opts ...PagingOpt) pagingParams {
-	params := pagingParams{}
+type PageOpt func(*pageRequest)
+
+func newPageRequest(idColumn string, opts ...PageOpt) (pageRequest, error) {
+	req := pageRequest{
+		PageNumber: 0,
+		PageSize:   10,
+		SortBy:     idColumn,
+		SortDesc:   false,
+	}
 
 	for _, o := range opts {
-		o(&params)
+		o(&req)
 	}
 
-	return params
-}
-
-type PagingOpt func(*pagingParams)
-
-func WithOffset(offset uint) PagingOpt {
-	return func(p *pagingParams) {
-		p.Offset = offset
+	if err := req.validate(); err != nil {
+		return pageRequest{}, fmt.Errorf("invalid page request: %w", err)
 	}
+
+	return req, nil
 }
 
-func WithLimit(limit uint) PagingOpt {
-	return func(p *pagingParams) {
-		p.Limit = limit
+func (p pageRequest) validate() error {
+	if p.PageSize <= 0 {
+		return fmt.Errorf("page size must be greater than 0, but received %d: %w",
+			p.PageSize, ErrInvalidPageSize)
 	}
+	return nil
 }
 
-func WithOrderColumn(orderColumn string) PagingOpt {
-	return func(p *pagingParams) {
-		p.OrderColumn = orderColumn
+func WithPageNumber(number uint) PageOpt {
+	return func(p *pageRequest) {
+		p.PageNumber = number
 	}
 }
 
-func WithOrderColumnAndDirection(orderColumn string, desc bool) PagingOpt {
-	return func(p *pagingParams) {
-		p.OrderColumn = orderColumn
-		p.OrderDesc = desc
+func WithPageSize(size uint) PageOpt {
+	return func(p *pageRequest) {
+		p.PageSize = size
+	}
+}
+
+func WithSort(column string) PageOpt {
+	return func(p *pageRequest) {
+		p.SortBy = column
+		p.SortDesc = false
+	}
+}
+
+func WithSortDesc(column string) PageOpt {
+	return func(p *pageRequest) {
+		p.SortBy = column
+		p.SortDesc = true
 	}
 }
 
@@ -85,7 +107,7 @@ type CRUD[T any, I comparable] interface {
 
 	GetAll(ctx context.Context) ([]T, error)
 
-	GetPage(ctx context.Context, opts ...PagingOpt) (Page[T], error)
+	GetPage(ctx context.Context, opts ...PageOpt) (Page[T], error)
 
 	GetByID(ctx context.Context, id I) (T, error)
 
@@ -165,8 +187,11 @@ func (r *sqlCredo[T, I]) GetAll(ctx context.Context) ([]T, error) {
 	return r.selectValuesBuilderContext(ctx, builder.ToSQL)
 }
 
-func (r *sqlCredo[T, I]) GetPage(ctx context.Context, opts ...PagingOpt) (Page[T], error) {
-	params := newPagingParams(opts...)
+func (r *sqlCredo[T, I]) GetPage(ctx context.Context, opts ...PageOpt) (Page[T], error) {
+	params, err := newPageRequest(r.idColumn, opts...)
+	if err != nil {
+		return r.emptyPage, fmt.Errorf("unable to create page request: %w", err)
+	}
 
 	pageRecords, err := r.selectMany(ctx, params)
 	if err != nil {
@@ -181,12 +206,9 @@ func (r *sqlCredo[T, I]) GetPage(ctx context.Context, opts ...PagingOpt) (Page[T
 		return r.emptyPage, nil
 	}
 
-	pageNumber := params.Offset / params.Limit
+	pageNumber := params.PageNumber
 
-	totalPages := uint(totalRecords) / params.Limit
-	if uint(totalRecords)%params.Limit != 0 {
-		totalPages += 1
-	}
+	totalPages := uint(math.Ceil(float64(totalRecords) / float64(params.PageSize)))
 
 	return Page[T]{
 		Number:     pageNumber,
@@ -197,20 +219,22 @@ func (r *sqlCredo[T, I]) GetPage(ctx context.Context, opts ...PagingOpt) (Page[T
 	}, nil
 }
 
-func (r *sqlCredo[T, I]) selectMany(ctx context.Context, paging pagingParams) ([]T, error) {
-	return r.selectValuesBuilderContext(ctx, r.selectManyQueryBuilder(paging))
+func (r *sqlCredo[T, I]) selectMany(ctx context.Context, req pageRequest) ([]T, error) {
+	return r.selectValuesBuilderContext(ctx, r.selectManyQueryBuilder(req))
 }
 
-func (r *sqlCredo[T, I]) selectManyQueryBuilder(params pagingParams) queryBuilder {
+func (r *sqlCredo[T, I]) selectManyQueryBuilder(req pageRequest) queryBuilder {
 	builder := goqu.From(r.table).Prepared(true)
 
-	builder = builder.Offset(params.Offset)
-	builder = builder.Limit(params.Limit)
+	offset := req.PageNumber * req.PageSize
 
-	if params.OrderDesc {
-		builder = builder.Order(goqu.I(params.OrderColumn).Desc())
+	builder = builder.Offset(offset)
+	builder = builder.Limit(req.PageSize)
+
+	if req.SortDesc {
+		builder = builder.Order(goqu.I(req.SortBy).Desc())
 	} else {
-		builder = builder.Order(goqu.I(params.OrderColumn).Asc())
+		builder = builder.Order(goqu.I(req.SortBy).Asc())
 	}
 
 	return builder.ToSQL
