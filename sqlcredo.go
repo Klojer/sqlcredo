@@ -12,8 +12,9 @@ import (
 )
 
 var (
-	ErrRecordNotFound  = errors.New("record not found")
-	ErrInvalidPageSize = errors.New("invalid page size")
+	ErrRecordNotFound            = errors.New("record not found")
+	ErrUnexpectedNumberOfRecords = errors.New("unexpected number of records")
+	ErrInvalidPageSize           = errors.New("invalid page size")
 )
 
 const (
@@ -247,31 +248,20 @@ func (r *sqlCredo[T, I]) GetByID(ctx context.Context, id I) (T, error) {
 
 	var empty T
 
-	entities, err := r.selectValuesBuilderContext(context.Background(), builder.ToSQL)
+	entities, err := r.selectValuesBuilderContext(ctx, builder.ToSQL)
 	if err != nil {
 		return empty, fmt.Errorf("failed to select entities values: %w", err)
 	}
 
-	// TODO: check there is exact one entity in result
 	if len(entities) < 1 {
 		return empty, ErrRecordNotFound
 	}
-
-	return entities[0], nil
-}
-
-func (r *sqlCredo[T, I]) GetByIDsContext(ctx context.Context, ids []I) ([]*T, error) {
-	builder := goqu.From(r.table).
-		Where(goqu.I(r.idColumn).In(ids)).
-		Order(goqu.I(r.idColumn).Asc()).
-		Prepared(true)
-
-	entities, err := r.selectBuilderContext(ctx, builder.ToSQL)
-	if err != nil {
-		return nil, fmt.Errorf("failed to select entities: %w", err)
+	if len(entities) > 1 {
+		return empty, fmt.Errorf("expected number of records 1, but found %d: %w",
+			len(entities), ErrUnexpectedNumberOfRecords)
 	}
 
-	return entities, nil
+	return entities[0], nil
 }
 
 func (r *sqlCredo[T, I]) GetByIDs(ctx context.Context, ids []I) ([]T, error) {
@@ -338,20 +328,6 @@ func (r *sqlCredo[T, I]) execBuilderContext(ctx context.Context, builder queryBu
 	}
 
 	return nil
-}
-
-func (r *sqlCredo[T, I]) selectBuilderContext(ctx context.Context, builder queryBuilder) ([]*T, error) {
-	sql, args, err := builder()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create select query: %w", err)
-	}
-
-	var entities []*T
-	if err = r.SelectMany(ctx, &entities, sql, args...); err != nil {
-		return nil, fmt.Errorf("failed to load enitites: %w", err)
-	}
-
-	return entities, nil
 }
 
 func (r *sqlCredo[T, I]) selectValuesBuilderContext(ctx context.Context, builder queryBuilder) ([]T, error) {
