@@ -95,10 +95,12 @@ var _ = g.Describe("UserRepo", func() {
 				WithDebugFunc(debugFunc),
 		}
 
-		o.Expect(repo.InitSchema(ctx, schema)).NotTo(o.HaveOccurred())
+		_, err := repo.InitSchema(ctx, schema)
+		o.Expect(err).NotTo(o.HaveOccurred())
 
 		for _, u := range testUserPtrs {
-			o.Expect(repo.Create(ctx, u)).NotTo(o.HaveOccurred())
+			_, err := repo.Create(ctx, u)
+			o.Expect(err).NotTo(o.HaveOccurred())
 		}
 
 		cnt, err := repo.Count(ctx)
@@ -107,7 +109,7 @@ var _ = g.Describe("UserRepo", func() {
 	})
 
 	g.AfterEach(func() {
-		if err := repo.DeleteAll(ctx); err != nil {
+		if _, err := repo.DeleteAll(ctx); err != nil {
 			g.GinkgoLogr.Error(err, "unable to clear after case")
 		}
 	})
@@ -118,7 +120,8 @@ var _ = g.Describe("UserRepo", func() {
 
 			g.JustBeforeEach(func() {
 				user = &User{"u99", "Gordon", ptr("Gibs"), newTime("1931-09-03")}
-				o.Expect(repo.Create(ctx, user)).NotTo(o.HaveOccurred())
+				_, err := repo.Create(ctx, user)
+				o.Expect(err).NotTo(o.HaveOccurred())
 			})
 
 			g.It("should be accessable by id", func() {
@@ -185,7 +188,8 @@ var _ = g.Describe("UserRepo", func() {
 
 		g.When("delete user", func() {
 			g.JustBeforeEach(func() {
-				o.Expect(repo.Delete(ctx, testUserValues[1].ID)).NotTo(o.HaveOccurred())
+				_, err := repo.Delete(ctx, testUserValues[1].ID)
+				o.Expect(err).NotTo(o.HaveOccurred())
 			})
 
 			g.It("should be absent in database", func() {
@@ -202,7 +206,8 @@ var _ = g.Describe("UserRepo", func() {
 				updated = testUserPtrs[1]
 				updated.FirstName = updated.FirstName + "_updated"
 
-				o.Expect(repo.Update(ctx, updated.ID, updated)).NotTo(o.HaveOccurred())
+				_, err := repo.Update(ctx, updated.ID, updated)
+				o.Expect(err).NotTo(o.HaveOccurred())
 			})
 
 			g.It("should be updated in database", func() {

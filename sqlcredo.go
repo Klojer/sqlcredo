@@ -104,7 +104,7 @@ type Page[T any] struct {
 }
 
 type CRUD[T any, I comparable] interface {
-	InitSchema(ctx context.Context, sql string) error
+	InitSchema(ctx context.Context, sql string) (sql.Result, error)
 
 	GetAll(ctx context.Context) ([]T, error)
 
@@ -114,13 +114,13 @@ type CRUD[T any, I comparable] interface {
 
 	GetByIDs(ctx context.Context, ids []I) ([]T, error)
 
-	Create(ctx context.Context, e *T) error
+	Create(ctx context.Context, e *T) (sql.Result, error)
 
-	DeleteAll(ctx context.Context) error
+	DeleteAll(ctx context.Context) (sql.Result, error)
 
-	Delete(ctx context.Context, id I) error
+	Delete(ctx context.Context, id I) (sql.Result, error)
 
-	Update(ctx context.Context, id I, e *T) error
+	Update(ctx context.Context, id I, e *T) (sql.Result, error)
 
 	Count(ctx context.Context) (uint64, error)
 }
@@ -175,12 +175,12 @@ func (r *sqlCredo[T, I]) GetDebugFunc() DebugFunc {
 	return r.debugFunc
 }
 
-func (r *sqlCredo[T, I]) InitSchema(ctx context.Context, sql string) error {
-	_, err := r.db.ExecContext(ctx, sql)
+func (r *sqlCredo[T, I]) InitSchema(ctx context.Context, sql string) (sql.Result, error) {
+	res, err := r.db.ExecContext(ctx, sql)
 	if err != nil {
-		return fmt.Errorf("failed to execute query: %w", err)
+		return nil, fmt.Errorf("failed to execute query: %w", err)
 	}
-	return nil
+	return res, nil
 }
 
 func (r *sqlCredo[T, I]) GetAll(ctx context.Context) ([]T, error) {
@@ -278,7 +278,7 @@ func (r *sqlCredo[T, I]) GetByIDs(ctx context.Context, ids []I) ([]T, error) {
 	return entities, nil
 }
 
-func (r *sqlCredo[T, I]) Create(ctx context.Context, e *T) error {
+func (r *sqlCredo[T, I]) Create(ctx context.Context, e *T) (sql.Result, error) {
 	builder := goqu.Insert(r.table).
 		Rows(e).
 		Prepared(true)
@@ -286,12 +286,11 @@ func (r *sqlCredo[T, I]) Create(ctx context.Context, e *T) error {
 	return r.execBuilderContext(ctx, builder.ToSQL)
 }
 
-func (r *sqlCredo[T, I]) DeleteAll(ctx context.Context) error {
-	_, err := r.Exec(ctx, r.truncateQuery)
-	return err
+func (r *sqlCredo[T, I]) DeleteAll(ctx context.Context) (sql.Result, error) {
+	return r.Exec(ctx, r.truncateQuery)
 }
 
-func (r *sqlCredo[T, I]) Delete(ctx context.Context, id I) error {
+func (r *sqlCredo[T, I]) Delete(ctx context.Context, id I) (sql.Result, error) {
 	builder := goqu.Delete(r.table).
 		Where(goqu.I(r.idColumn).Eq(id)).
 		Prepared(true)
@@ -299,7 +298,7 @@ func (r *sqlCredo[T, I]) Delete(ctx context.Context, id I) error {
 	return r.execBuilderContext(ctx, builder.ToSQL)
 }
 
-func (r *sqlCredo[T, I]) Update(ctx context.Context, id I, e *T) error {
+func (r *sqlCredo[T, I]) Update(ctx context.Context, id I, e *T) (sql.Result, error) {
 	builder := goqu.Update(r.table).
 		Set(*e).
 		Where(goqu.I(r.idColumn).Eq(id)).
@@ -317,17 +316,18 @@ func (r *sqlCredo[T, I]) Count(ctx context.Context) (uint64, error) {
 	return res, nil
 }
 
-func (r *sqlCredo[T, I]) execBuilderContext(ctx context.Context, builder queryBuilder) error {
+func (r *sqlCredo[T, I]) execBuilderContext(ctx context.Context, builder queryBuilder) (sql.Result, error) {
 	sql, args, err := builder()
 	if err != nil {
-		return fmt.Errorf("failed to create sql query: %w", err)
+		return nil, fmt.Errorf("failed to create sql query: %w", err)
 	}
 
-	if _, err := r.Exec(ctx, sql, args...); err != nil {
-		return fmt.Errorf("failed to execute sql query: %w", err)
+	res, err := r.Exec(ctx, sql, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute sql query: %w", err)
 	}
 
-	return nil
+	return res, nil
 }
 
 func (r *sqlCredo[T, I]) selectValuesBuilderContext(ctx context.Context, builder queryBuilder) ([]T, error) {
