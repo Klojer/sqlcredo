@@ -50,7 +50,7 @@ func newTestCase(t *testing.T) *testCase {
 	require.NoError(t, err)
 	require.Equal(t, len(testUserPtrs), int(cnt))
 
-	return &testCase{
+	c := &testCase{
 		Ctx:          ctx,
 		ctxCancel:    ctxCancel,
 		TestUsers:    testUserValues,
@@ -58,6 +58,12 @@ func newTestCase(t *testing.T) *testCase {
 		db:           db,
 		UnderTest:    repo,
 	}
+
+	t.Cleanup(func() {
+		c.TearDown(t)
+	})
+
+	return c
 }
 
 func (c *testCase) TearDown(t *testing.T) {
@@ -69,7 +75,6 @@ func (c *testCase) TearDown(t *testing.T) {
 
 func TestCreateUser(t *testing.T) {
 	c := newTestCase(t)
-	defer c.TearDown(t)
 
 	expected := &User{"u99", "Gordon", ptr("Gibs"), newTime("1931-09-03")}
 	_, err := c.UnderTest.Create(c.Ctx, expected)
@@ -82,7 +87,6 @@ func TestCreateUser(t *testing.T) {
 
 func TestGetAllUsers(t *testing.T) {
 	c := newTestCase(t)
-	defer c.TearDown(t)
 
 	got, err := c.UnderTest.GetAll(c.Ctx)
 	assert.NoError(t, err)
@@ -91,7 +95,6 @@ func TestGetAllUsers(t *testing.T) {
 
 func TestGetUserByID(t *testing.T) {
 	c := newTestCase(t)
-	defer c.TearDown(t)
 
 	got, err := c.UnderTest.GetByID(c.Ctx, c.TestUsers[2].ID)
 	assert.NoError(t, err)
@@ -100,7 +103,6 @@ func TestGetUserByID(t *testing.T) {
 
 func TestGetUsersByIDs(t *testing.T) {
 	c := newTestCase(t)
-	defer c.TearDown(t)
 
 	ids := []Identity{c.TestUserPtrs[1].ID, c.TestUserPtrs[2].ID}
 	got, err := c.UnderTest.GetByIDs(c.Ctx, ids)
@@ -110,7 +112,6 @@ func TestGetUsersByIDs(t *testing.T) {
 
 func TestDeleteUser(t *testing.T) {
 	c := newTestCase(t)
-	defer c.TearDown(t)
 
 	_, err := c.UnderTest.Delete(c.Ctx, c.TestUsers[1].ID)
 	assert.NoError(t, err)
@@ -121,7 +122,6 @@ func TestDeleteUser(t *testing.T) {
 
 func TestUpdateUser(t *testing.T) {
 	c := newTestCase(t)
-	defer c.TearDown(t)
 
 	updated := c.TestUserPtrs[1]
 	updated.FirstName = updated.FirstName + "_updated"
@@ -136,7 +136,6 @@ func TestUpdateUser(t *testing.T) {
 
 func TestCountUsers(t *testing.T) {
 	c := newTestCase(t)
-	defer c.TearDown(t)
 
 	got, err := c.UnderTest.Count(c.Ctx)
 	assert.NoError(t, err)
@@ -145,7 +144,6 @@ func TestCountUsers(t *testing.T) {
 
 func TestCountByLastNameExists(t *testing.T) {
 	c := newTestCase(t)
-	defer c.TearDown(t)
 
 	got, err := c.UnderTest.CountByLastNameExists(c.Ctx)
 	assert.NoError(t, err)
@@ -157,7 +155,6 @@ func TestCountByLastNameExists(t *testing.T) {
 
 func TestValidatePageRequest(t *testing.T) {
 	c := newTestCase(t)
-	defer c.TearDown(t)
 
 	_, err := c.UnderTest.GetPage(c.Ctx, model.WithPageSize(0))
 	assert.ErrorIs(t, err, model.ErrInvalidPageSize)
@@ -165,7 +162,6 @@ func TestValidatePageRequest(t *testing.T) {
 
 func TestGetPage(t *testing.T) {
 	c := newTestCase(t)
-	defer c.TearDown(t)
 
 	gotPage1, err := c.UnderTest.GetPage(c.Ctx,
 		model.WithPageNumber(0), model.WithPageSize(2), model.WithSort("id"))
