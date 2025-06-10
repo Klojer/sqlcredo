@@ -23,18 +23,30 @@ go get github.com/Klojer/sqlcredo
 ## Quick Start
 
 ```go
+package main
+
 import (
  "context"
  "database/sql"
+ "fmt"
 
- "github/Klojer/sqlcredo"
- "github/Klojer/sqlcredo/pkg/model"
+ _ "github.com/mattn/go-sqlite3"
+
+ "github.com/Klojer/sqlcredo"
+ "github.com/Klojer/sqlcredo/pkg/model"
 )
 
 type User struct {
  ID   int    `db:"id"`
  Name string `db:"name"`
 }
+
+const schema = `
+CREATE TABLE IF NOT EXISTS users (
+    id TEXT NOT NULL PRIMARY KEY,
+    name TEXT NOT NULL
+);
+`
 
 func main() {
  ctx := context.Background()
@@ -43,14 +55,18 @@ func main() {
  db, _ := sql.Open("sqlite3", "test.db")
  repo := sqlcredo.NewSQLCredo[User, int](db, "sqlite3", "users", "id")
 
+ _, err := repo.InitSchema(ctx, schema)
+ orPanic(err)
+
  // Create
  user := User{ID: 1, Name: "John"}
- _, err := repo.Create(ctx, &user)
+ _, err = repo.Create(ctx, &user)
  orPanic(err)
 
  // Read
  users, err := repo.GetAll(ctx)
  orPanic(err)
+ fmt.Printf("Users: %+v\n", users)
 
  // Read with pagination
  page, err := repo.GetPage(ctx,
@@ -58,8 +74,10 @@ func main() {
   model.WithPageSize(10),
   model.WithSortBy("name"))
  orPanic(err)
+ fmt.Printf("Page: %+v\n", page)
 
  // Update
+ user.Name = "Johnnnn"
  _, err = repo.Update(ctx, 1, &user)
  orPanic(err)
 
