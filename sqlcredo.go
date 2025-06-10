@@ -8,6 +8,7 @@ import (
 	"gitlab.com/onrooh/sqlcredo/internal/crud"
 	"gitlab.com/onrooh/sqlcredo/internal/page"
 	"gitlab.com/onrooh/sqlcredo/internal/sqlexec"
+	"gitlab.com/onrooh/sqlcredo/internal/table"
 	"gitlab.com/onrooh/sqlcredo/pkg/model"
 
 	"github.com/jmoiron/sqlx"
@@ -32,8 +33,8 @@ type sqlCredo[T any, I comparable] struct {
 
 var _ SQLCredo[any, string] = &sqlCredo[any, string]{}
 
-func NewSQLCredo[T any, I comparable](db *sql.DB, driver string, table string, idColumn string) SQLCredo[T, I] {
-	tableInfo := model.TableInfo{Name: table, IDColumn: idColumn}
+func NewSQLCredo[T any, I comparable](db *sql.DB, driver string, tableName string, idColumn string) SQLCredo[T, I] {
+	tableInfo := table.Info{Name: tableName, IDColumn: idColumn}
 	dbx := sqlx.NewDb(db, driver)
 	executor := sqlexec.NewSQLExecutor(dbx)
 

@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"gitlab.com/onrooh/sqlcredo/internal/goquext"
+	"gitlab.com/onrooh/sqlcredo/internal/table"
 	"gitlab.com/onrooh/sqlcredo/pkg/model"
 
 	"github.com/doug-martin/goqu/v9"
@@ -17,7 +18,7 @@ const (
 )
 
 type CRUD[T any, I comparable] struct {
-	table         model.TableInfo
+	table         table.Info
 	executor      model.SQLExecutor
 	truncateQuery string
 	dialect       goqu.DialectWrapper
@@ -25,7 +26,7 @@ type CRUD[T any, I comparable] struct {
 
 var _ model.CRUD[any, string] = &CRUD[any, string]{}
 
-func NewCRUD[T any, I comparable](table model.TableInfo,
+func NewCRUD[T any, I comparable](table table.Info,
 	executor model.SQLExecutor, driver string,
 ) *CRUD[T, I] {
 	return &CRUD[T, I]{
@@ -55,7 +56,6 @@ func (r *CRUD[T, I]) GetByID(ctx context.Context, id I) (T, error) {
 		return record, fmt.Errorf("unable to create 'select by id' query: %w", err)
 	}
 
-	// TODO: validate record found
 	err = r.executor.SelectOne(ctx, &record, query, args...)
 	if err != nil {
 		return record, fmt.Errorf("unable to select record: %w", err)

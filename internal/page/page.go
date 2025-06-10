@@ -6,6 +6,7 @@ import (
 	"math"
 
 	"gitlab.com/onrooh/sqlcredo/internal/goquext"
+	"gitlab.com/onrooh/sqlcredo/internal/table"
 	"gitlab.com/onrooh/sqlcredo/pkg/model"
 
 	"github.com/doug-martin/goqu/v9"
@@ -16,7 +17,7 @@ const (
 )
 
 type PageResolver[T any] struct {
-	table      model.TableInfo
+	table      table.Info
 	executor   model.SQLExecutor
 	countQuery string
 	emptyPage  model.Page[T]
@@ -25,7 +26,7 @@ type PageResolver[T any] struct {
 
 var _ model.PageResolver[any] = &PageResolver[any]{}
 
-func NewPageResolver[T any](table model.TableInfo,
+func NewPageResolver[T any](table table.Info,
 	executor model.SQLExecutor, driver string,
 ) *PageResolver[T] {
 	return &PageResolver[T]{

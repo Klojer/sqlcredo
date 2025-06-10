@@ -2,35 +2,8 @@ package model
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 )
-
-type TableInfo struct {
-	Name     string
-	IDColumn string
-}
-
-type (
-	DebugFunc func(sql string, args ...any)
-)
-
-type SQLExecutor interface {
-	SelectOne(ctx context.Context, dest any, query string, args ...any) error
-	SelectMany(ctx context.Context, dest any, query string, args ...any) error
-	Exec(ctx context.Context, query string, args ...any) (sql.Result, error)
-	BeginTx(ctx context.Context, opts *sql.TxOptions) (*sql.Tx, error)
-}
-
-type CRUD[T any, I comparable] interface {
-	GetAll(ctx context.Context) ([]T, error)
-	GetByID(ctx context.Context, id I) (T, error)
-	GetByIDs(ctx context.Context, ids []I) ([]T, error)
-	Create(ctx context.Context, e *T) (sql.Result, error)
-	DeleteAll(ctx context.Context) (sql.Result, error)
-	Delete(ctx context.Context, id I) (sql.Result, error)
-	Update(ctx context.Context, id I, e *T) (sql.Result, error)
-}
 
 type Page[T any] struct {
 	Number     uint
