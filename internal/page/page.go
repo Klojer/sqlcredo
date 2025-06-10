@@ -39,7 +39,7 @@ func NewPageResolver[T any](table table.Info,
 }
 
 func (r *PageResolver[T]) GetPage(ctx context.Context, opts ...model.PageOpt) (model.Page[T], error) {
-	req, err := newPageRequest(r.table.IDColumn, opts...)
+	req, err := newPageParams(r.table.IDColumn, opts...)
 	if err != nil {
 		return r.emptyPage, fmt.Errorf("unable to create page request: %w", err)
 	}
@@ -74,18 +74,18 @@ func (r *PageResolver[T]) GetPage(ctx context.Context, opts ...model.PageOpt) (m
 	}, nil
 }
 
-func (r *PageResolver[T]) createPageQueryBuilder(req model.PageRequest) (string, []any, error) {
+func (r *PageResolver[T]) createPageQueryBuilder(params model.PageParams) (string, []any, error) {
 	builder := r.dialect.From(r.table.Name).Prepared(true)
 
-	offset := req.PageNumber * req.PageSize
+	offset := params.PageNumber * params.PageSize
 
 	builder = builder.Offset(offset)
-	builder = builder.Limit(req.PageSize)
+	builder = builder.Limit(params.PageSize)
 
-	if req.SortDesc {
-		builder = builder.Order(goqu.I(req.SortBy).Desc())
+	if params.SortDesc {
+		builder = builder.Order(goqu.I(params.SortBy).Desc())
 	} else {
-		builder = builder.Order(goqu.I(req.SortBy).Asc())
+		builder = builder.Order(goqu.I(params.SortBy).Asc())
 	}
 
 	return builder.ToSQL()
@@ -107,8 +107,8 @@ func (r *PageResolver[T]) selectMany(ctx context.Context, query string, args ...
 	return records, nil
 }
 
-func newPageRequest(idColumn string, opts ...model.PageOpt) (model.PageRequest, error) {
-	req := model.PageRequest{
+func newPageParams(idColumn string, opts ...model.PageOpt) (model.PageParams, error) {
+	params := model.PageParams{
 		PageNumber: 0,
 		PageSize:   10,
 		SortBy:     idColumn,
@@ -116,14 +116,14 @@ func newPageRequest(idColumn string, opts ...model.PageOpt) (model.PageRequest, 
 	}
 
 	for _, o := range opts {
-		o(&req)
+		o(&params)
 	}
 
-	if err := req.Validate(); err != nil {
-		return model.PageRequest{}, fmt.Errorf("invalid page request: %w", err)
+	if err := params.Validate(); err != nil {
+		return model.PageParams{}, fmt.Errorf("invalid page params: %w", err)
 	}
 
-	return req, nil
+	return params, nil
 }
 
 func newEmptyPage[T any]() model.Page[T] {

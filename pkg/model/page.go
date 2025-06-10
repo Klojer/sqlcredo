@@ -13,16 +13,16 @@ type Page[T any] struct {
 	Content    []T
 }
 
-type PageRequest struct {
+type PageParams struct {
 	PageNumber uint
 	PageSize   uint
 	SortBy     string
 	SortDesc   bool
 }
 
-type PageOpt func(*PageRequest)
+type PageOpt func(*PageParams)
 
-func (p PageRequest) Validate() error {
+func (p PageParams) Validate() error {
 	if p.PageSize <= 0 {
 		return fmt.Errorf("page size must be greater than 0, but received %d: %w",
 			p.PageSize, ErrInvalidPageSize)
@@ -31,26 +31,26 @@ func (p PageRequest) Validate() error {
 }
 
 func WithPageNumber(number uint) PageOpt {
-	return func(p *PageRequest) {
+	return func(p *PageParams) {
 		p.PageNumber = number
 	}
 }
 
 func WithPageSize(size uint) PageOpt {
-	return func(p *PageRequest) {
+	return func(p *PageParams) {
 		p.PageSize = size
 	}
 }
 
 func WithSort(column string) PageOpt {
-	return func(p *PageRequest) {
+	return func(p *PageParams) {
 		p.SortBy = column
 		p.SortDesc = false
 	}
 }
 
 func WithSortDesc(column string) PageOpt {
-	return func(p *PageRequest) {
+	return func(p *PageParams) {
 		p.SortBy = column
 		p.SortDesc = true
 	}
