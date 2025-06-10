@@ -76,7 +76,7 @@ func orPanic(err error) {
 }
 ```
 
-See example of repository with custom query: `examples/users/users.go`
+See example of repository with custom query: [examples/users/users.go](https://github.com/Klojer/sqlcredo/blob/546f50239e1f399e8559534a8e3d02c748a89b09/examples/users/users.go)
 
 ## Debug Support
 
