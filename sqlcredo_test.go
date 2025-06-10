@@ -1,8 +1,11 @@
 package sqlcredo_test
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -28,8 +31,8 @@ func createTestUsers() ([]users.Object, []*users.Object) {
 	values := []users.Object{
 		{"u0", "John", ptr("Smith"), newTime("1989-03-05")},
 		{"u1", "Carl", nil, newTime("1973-01-09")},
-		{"u2", "Ann", ptr("Stone"), newTime("1985-08-01")},
-		{"u3", "Ann", ptr("Brick"), newTime("1987-03-02")},
+		{"u2", "Ann", ptr("Stone"), newTime("1987-03-01")},
+		{"u3", "Ann", ptr("Brick"), newTime("1985-08-02")},
 		{"u4", "Antony", nil, newTime("1987-03-02")},
 	}
 	ptrs := wrapWithPtrs(values)
@@ -159,7 +162,7 @@ func CaseGetPage(t *testing.T, params TestCaseParams) {
 	c, ctx := newTestCase(t, params)
 
 	gotPage1, err := c.UnderTest.GetPage(ctx,
-		model.WithPageNumber(0), model.WithPageSize(2), model.WithSort("id"))
+		model.WithPageNumber(0), model.WithPageSize(2))
 	assert.NoError(t, err)
 	assert.Equal(t, model.Page[users.Object]{
 		Number:     0,
@@ -170,7 +173,7 @@ func CaseGetPage(t *testing.T, params TestCaseParams) {
 	}, gotPage1)
 
 	gotPage2, err := c.UnderTest.GetPage(ctx,
-		model.WithPageNumber(1), model.WithPageSize(2), model.WithSort("id"))
+		model.WithPageNumber(1), model.WithPageSize(2))
 	assert.NoError(t, err)
 	assert.Equal(t, model.Page[users.Object]{
 		Number:     1,
@@ -181,7 +184,7 @@ func CaseGetPage(t *testing.T, params TestCaseParams) {
 	}, gotPage2)
 
 	gotPage3, err := c.UnderTest.GetPage(ctx,
-		model.WithPageNumber(2), model.WithPageSize(2), model.WithSort("id"))
+		model.WithPageNumber(2), model.WithPageSize(2))
 	assert.NoError(t, err)
 	assert.Equal(t, model.Page[users.Object]{
 		Number:     2,
@@ -190,6 +193,26 @@ func CaseGetPage(t *testing.T, params TestCaseParams) {
 		TotalPages: 3,
 		Content:    c.TestUsers[4:],
 	}, gotPage3)
+}
+
+func CaseGetPageCustomOrder(t *testing.T, params TestCaseParams) {
+	c, ctx := newTestCase(t, params)
+
+	gotPage, err := c.UnderTest.GetPage(ctx,
+		model.WithPageNumber(0),
+		model.WithPageSize(uint(len(c.TestUsers))),
+		model.WithSortBy("first_name"),
+		model.WithSortBy("last_name"),
+	)
+	assert.NoError(t, err)
+	assert.Equal(t, strings.TrimSpace(`
+Ann Brick
+Ann Stone
+Antony
+Carl
+John Smith
+`),
+		usersToString(gotPage.Content...))
 }
 
 func CaseCountUsers(t *testing.T, params TestCaseParams) {
@@ -236,4 +259,19 @@ func wrapWithPtrs[T comparable](input []T) []*T {
 
 func ptr[T comparable](input T) *T {
 	return &input
+}
+
+func usersToString(objects ...users.Object) string {
+	res := bytes.Buffer{}
+
+	for _, o := range objects {
+		if o.LastName != nil {
+			res.WriteString(fmt.Sprintf("%s %s", o.FirstName, *o.LastName))
+		} else {
+			res.WriteString(o.FirstName)
+		}
+		res.WriteString("\n")
+	}
+
+	return strings.TrimSpace(res.String())
 }

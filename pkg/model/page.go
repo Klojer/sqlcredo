@@ -16,7 +16,7 @@ type Page[T any] struct {
 type PageParams struct {
 	PageNumber uint
 	PageSize   uint
-	SortBy     string
+	SortBy     []string
 	SortDesc   bool
 }
 
@@ -42,16 +42,17 @@ func WithPageSize(size uint) PageOpt {
 	}
 }
 
-func WithSort(column string) PageOpt {
+func WithSortBy(column string) PageOpt {
 	return func(p *PageParams) {
-		p.SortBy = column
-		p.SortDesc = false
+		if p.SortBy == nil {
+			p.SortBy = make([]string, 0)
+		}
+		p.SortBy = append(p.SortBy, column)
 	}
 }
 
 func WithSortDesc(column string) PageOpt {
 	return func(p *PageParams) {
-		p.SortBy = column
 		p.SortDesc = true
 	}
 }

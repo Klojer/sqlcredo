@@ -45,6 +45,7 @@ func TestPostgres(t *testing.T) {
 		{name: "update-user", run: CaseUpdateUser},
 		{name: "validate-page-request", run: CaseValidatePageRequest},
 		{name: "get-page", run: CaseGetPage},
+		{name: "get-page-custom-order", run: CaseGetPageCustomOrder},
 		{name: "count-users", run: CaseCountUsers},
 		{name: "count-by-last-name-exists", run: CaseCountByLastNameExists},
 	}

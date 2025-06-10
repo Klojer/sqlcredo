@@ -10,6 +10,7 @@ import (
 	"gitlab.com/onrooh/sqlcredo/pkg/model"
 
 	"github.com/doug-martin/goqu/v9"
+	"github.com/doug-martin/goqu/v9/exp"
 )
 
 const (
@@ -76,19 +77,22 @@ func (r *PageResolver[T]) GetPage(ctx context.Context, opts ...model.PageOpt) (m
 
 func (r *PageResolver[T]) createPageQueryBuilder(params model.PageParams) (string, []any, error) {
 	builder := r.dialect.From(r.table.Name).Prepared(true)
-
-	offset := params.PageNumber * params.PageSize
-
-	builder = builder.Offset(offset)
+	builder = builder.Offset(params.PageNumber * params.PageSize)
 	builder = builder.Limit(params.PageSize)
-
-	if params.SortDesc {
-		builder = builder.Order(goqu.I(params.SortBy).Desc())
-	} else {
-		builder = builder.Order(goqu.I(params.SortBy).Asc())
-	}
-
+	builder = builder.Order(buildOrderExprs(params)...)
 	return builder.ToSQL()
+}
+
+func buildOrderExprs(params model.PageParams) []exp.OrderedExpression {
+	orderExprs := make([]exp.OrderedExpression, 0, len(params.SortBy))
+	for _, s := range params.SortBy {
+		if params.SortDesc {
+			orderExprs = append(orderExprs, goqu.I(s).Desc())
+		} else {
+			orderExprs = append(orderExprs, goqu.I(s).Asc())
+		}
+	}
+	return orderExprs
 }
 
 func (r *PageResolver[T]) Count(ctx context.Context) (uint64, error) {
@@ -111,7 +115,6 @@ func newPageParams(idColumn string, opts ...model.PageOpt) (model.PageParams, er
 	params := model.PageParams{
 		PageNumber: 0,
 		PageSize:   10,
-		SortBy:     idColumn,
 		SortDesc:   false,
 	}
 
@@ -121,6 +124,10 @@ func newPageParams(idColumn string, opts ...model.PageOpt) (model.PageParams, er
 
 	if err := params.Validate(); err != nil {
 		return model.PageParams{}, fmt.Errorf("invalid page params: %w", err)
+	}
+
+	if params.SortBy == nil {
+		params.SortBy = []string{idColumn}
 	}
 
 	return params, nil
