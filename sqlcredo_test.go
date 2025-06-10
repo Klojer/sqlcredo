@@ -3,14 +3,13 @@ package sqlcredo_test
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	sc "gitlab.com/onrooh/sqlcredo"
+	"gitlab.com/onrooh/sqlcredo/examples/users"
 	"gitlab.com/onrooh/sqlcredo/pkg/model"
 )
 
@@ -25,25 +24,34 @@ type TestCaseParams struct {
 	DB     *sql.DB
 }
 
+func createTestUsers() ([]users.Object, []*users.Object) {
+	values := []users.Object{
+		{"u0", "John", ptr("Smith"), newTime("1989-03-05")},
+		{"u1", "Carl", nil, newTime("1973-01-09")},
+		{"u2", "Ann", ptr("Stone"), newTime("1985-08-01")},
+		{"u3", "Ann", ptr("Brick"), newTime("1987-03-02")},
+		{"u4", "Antony", nil, newTime("1987-03-02")},
+	}
+	ptrs := wrapWithPtrs(values)
+	return values, ptrs
+}
+
 type testCaseData struct {
 	ctx       context.Context
 	ctxCancel func()
 
-	TestUsers    []User
-	TestUserPtrs []*User
+	TestUsers    []users.Object
+	TestUserPtrs []*users.Object
 
 	db        *sql.DB
-	UnderTest UserRepo
+	UnderTest *users.Repo
 }
 
 func newTestCase(t *testing.T, params TestCaseParams) (*testCaseData, context.Context) {
 	ctx, ctxCancel := context.WithTimeout(context.Background(), 30*time.Second)
 	testUserValues, testUserPtrs := createTestUsers()
 
-	repo := UserRepo{
-		SQLCredo: sc.NewSQLCredo[User, Identity](params.DB, params.Driver, tableName, idColumn).
-			WithDebugFunc(createDebugFunc(t)),
-	}
+	repo := users.NewRepo(params.DB, params.Driver, createDebugFunc(t))
 
 	_, err := repo.InitSchema(ctx, params.Schema)
 	require.NoError(t, err)
@@ -82,7 +90,7 @@ func (c *testCaseData) TearDown(t *testing.T) {
 func CaseCreateUser(t *testing.T, params TestCaseParams) {
 	c, ctx := newTestCase(t, params)
 
-	expected := &User{"u99", "Gordon", ptr("Gibs"), newTime("1931-09-03")}
+	expected := &users.Object{"u99", "Gordon", ptr("Gibs"), newTime("1931-09-03")}
 	_, err := c.UnderTest.Create(ctx, expected)
 	assert.NoError(t, err)
 
@@ -110,10 +118,10 @@ func CaseGetUserByID(t *testing.T, params TestCaseParams) {
 func CaseGetUsersByIDs(t *testing.T, params TestCaseParams) {
 	c, ctx := newTestCase(t, params)
 
-	ids := []Identity{c.TestUserPtrs[1].ID, c.TestUserPtrs[2].ID}
+	ids := []users.Identity{c.TestUserPtrs[1].ID, c.TestUserPtrs[2].ID}
 	got, err := c.UnderTest.GetByIDs(ctx, ids)
 	assert.NoError(t, err)
-	assert.Equal(t, []User{c.TestUsers[1], c.TestUsers[2]}, got)
+	assert.Equal(t, []users.Object{c.TestUsers[1], c.TestUsers[2]}, got)
 }
 
 func CaseDeleteUser(t *testing.T, params TestCaseParams) {
@@ -153,7 +161,7 @@ func CaseGetPage(t *testing.T, params TestCaseParams) {
 	gotPage1, err := c.UnderTest.GetPage(ctx,
 		model.WithPageNumber(0), model.WithPageSize(2), model.WithSort("id"))
 	assert.NoError(t, err)
-	assert.Equal(t, model.Page[User]{
+	assert.Equal(t, model.Page[users.Object]{
 		Number:     0,
 		Size:       2,
 		Total:      5,
@@ -164,7 +172,7 @@ func CaseGetPage(t *testing.T, params TestCaseParams) {
 	gotPage2, err := c.UnderTest.GetPage(ctx,
 		model.WithPageNumber(1), model.WithPageSize(2), model.WithSort("id"))
 	assert.NoError(t, err)
-	assert.Equal(t, model.Page[User]{
+	assert.Equal(t, model.Page[users.Object]{
 		Number:     1,
 		Size:       2,
 		Total:      5,
@@ -175,7 +183,7 @@ func CaseGetPage(t *testing.T, params TestCaseParams) {
 	gotPage3, err := c.UnderTest.GetPage(ctx,
 		model.WithPageNumber(2), model.WithPageSize(2), model.WithSort("id"))
 	assert.NoError(t, err)
-	assert.Equal(t, model.Page[User]{
+	assert.Equal(t, model.Page[users.Object]{
 		Number:     2,
 		Size:       1,
 		Total:      5,
@@ -201,65 +209,6 @@ func CaseCountByLastNameExists(t *testing.T, params TestCaseParams) {
 		"with last_name":    3,
 		"without last_name": 2,
 	}, got)
-}
-
-type Identity string
-
-type User struct {
-	ID        Identity  `db:"id"`
-	FirstName string    `db:"first_name"`
-	LastName  *string   `db:"last_name"`
-	BirthDate time.Time `db:"birth_date"`
-}
-
-func (u *User) String() string {
-	return fmt.Sprintf("%v", *u)
-}
-
-var (
-	tableName = "users"
-	idColumn  = "id"
-)
-
-type UserRepo struct {
-	sc.SQLCredo[User, Identity]
-}
-
-const CountByLastNameExistsQuery = `
-SELECT 'with last_name' as category, COUNT(*) as cnt FROM users WHERE last_name IS NOT NULL
-UNION
-SELECT 'without last_name' as category, COUNT(*) as cnt FROM users WHERE last_name IS NULL;
-`
-
-type CountByLastNameExistsCategory struct {
-	Name  string `db:"category"`
-	Count int    `db:"cnt"`
-}
-
-func createTestUsers() ([]User, []*User) {
-	values := []User{
-		{"u0", "John", ptr("Smith"), newTime("1989-03-05")},
-		{"u1", "Carl", nil, newTime("1973-01-09")},
-		{"u2", "Ann", ptr("Stone"), newTime("1985-08-01")},
-		{"u3", "Ann", ptr("Brick"), newTime("1987-03-02")},
-		{"u4", "Antony", nil, newTime("1987-03-02")},
-	}
-	ptrs := wrapWithPtrs(values)
-	return values, ptrs
-}
-
-func (r *UserRepo) CountByLastNameExists(ctx context.Context) (map[string]int, error) {
-	var counters []CountByLastNameExistsCategory
-	if err := r.SelectMany(ctx, &counters, CountByLastNameExistsQuery); err != nil {
-		return nil, fmt.Errorf("unable to select records: %w", err)
-	}
-
-	res := map[string]int{}
-	for _, c := range counters {
-		res[c.Name] = c.Count
-	}
-
-	return res, nil
 }
 
 func createDebugFunc(t *testing.T) model.DebugFunc {
