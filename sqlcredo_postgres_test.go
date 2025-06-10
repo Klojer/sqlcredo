@@ -23,28 +23,11 @@ CREATE TABLE IF NOT EXISTS "users" (
     last_name TEXT NULL,
     birth_date TIMESTAMP NOT NULL
 );
-  `
+`
 )
 
 func TestPostgres(t *testing.T) {
-	ctx := context.Background()
-	// TODO: extract
-	pgContainer, err := postgres.Run(ctx, "postgres:15.3-alpine",
-		postgres.WithDatabase("test-db"),
-		postgres.WithUsername("postgres"),
-		postgres.WithPassword("postgres"),
-		testcontainers.WithWaitStrategy(
-			wait.ForLog("database system is ready to accept connections").
-				WithOccurrence(2).WithStartupTimeout(5*time.Second)),
-	)
-	require.NoError(t, err)
-
-	connStr, err := pgContainer.ConnectionString(ctx, "sslmode=disable")
-	require.NoError(t, err)
-
-	db, err := sql.Open(pgDriver, connStr)
-	require.NoError(t, err)
-
+	db := createDB(t)
 	defer func() { require.NoError(t, db.Close()) }()
 
 	params := TestCaseParams{
@@ -70,4 +53,26 @@ func TestPostgres(t *testing.T) {
 			tC.run(t, params)
 		})
 	}
+}
+
+func createDB(t *testing.T) *sql.DB {
+	ctx := context.Background()
+
+	pgContainer, err := postgres.Run(ctx, "postgres:15.3-alpine",
+		postgres.WithDatabase("test-db"),
+		postgres.WithUsername("postgres"),
+		postgres.WithPassword("postgres"),
+		testcontainers.WithWaitStrategy(
+			wait.ForLog("database system is ready to accept connections").
+				WithOccurrence(2).WithStartupTimeout(5*time.Second)),
+	)
+	require.NoError(t, err)
+
+	connStr, err := pgContainer.ConnectionString(ctx, "sslmode=disable")
+	require.NoError(t, err)
+
+	db, err := sql.Open(pgDriver, connStr)
+	require.NoError(t, err)
+
+	return db
 }
