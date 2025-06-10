@@ -1,4 +1,4 @@
-module gitlab.com/onrooh/sqlcredo
+module github/Klojer/sqlcredo
 
 go 1.23.0
 

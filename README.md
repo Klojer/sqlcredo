@@ -17,7 +17,7 @@ The idea of the package to provide basic CRUD and pagination operations out of t
 ## Installation
 
 ```go
-go get github.com/your-username/sqlcredo
+go get github.com/Klojer/sqlcredo
 ```
 
 ## Quick Start
