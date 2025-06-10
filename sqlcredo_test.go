@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -15,8 +14,19 @@ import (
 	"gitlab.com/onrooh/sqlcredo/pkg/model"
 )
 
-type testCase struct {
-	Ctx       context.Context
+type TestCaseDesc struct {
+	name string
+	run  func(*testing.T, TestCaseParams)
+}
+
+type TestCaseParams struct {
+	Schema string
+	Driver string
+	DB     *sql.DB
+}
+
+type testCaseData struct {
+	ctx       context.Context
 	ctxCancel func()
 
 	TestUsers    []User
@@ -26,19 +36,16 @@ type testCase struct {
 	UnderTest UserRepo
 }
 
-func newTestCase(t *testing.T) *testCase {
+func newTestCase(t *testing.T, params TestCaseParams) (*testCaseData, context.Context) {
 	ctx, ctxCancel := context.WithTimeout(context.Background(), 30*time.Second)
-	db, err := sql.Open(driver, dsn)
-	require.NoError(t, err)
-
 	testUserValues, testUserPtrs := createTestUsers()
 
 	repo := UserRepo{
-		SQLCredo: sc.NewSQLCredo[User, Identity](db, driver, tableName, idColumn).
+		SQLCredo: sc.NewSQLCredo[User, Identity](params.DB, params.Driver, tableName, idColumn).
 			WithDebugFunc(createDebugFunc(t)),
 	}
 
-	_, err = repo.InitSchema(ctx, schema)
+	_, err := repo.InitSchema(ctx, params.Schema)
 	require.NoError(t, err)
 
 	for _, u := range testUserPtrs {
@@ -50,12 +57,12 @@ func newTestCase(t *testing.T) *testCase {
 	require.NoError(t, err)
 	require.Equal(t, len(testUserPtrs), int(cnt))
 
-	c := &testCase{
-		Ctx:          ctx,
+	c := &testCaseData{
+		ctx:          ctx,
 		ctxCancel:    ctxCancel,
 		TestUsers:    testUserValues,
 		TestUserPtrs: testUserPtrs,
-		db:           db,
+		db:           params.DB,
 		UnderTest:    repo,
 	}
 
@@ -63,107 +70,87 @@ func newTestCase(t *testing.T) *testCase {
 		c.TearDown(t)
 	})
 
-	return c
+	return c, ctx
 }
 
-func (c *testCase) TearDown(t *testing.T) {
-	_, err := c.UnderTest.DeleteAll(c.Ctx)
+func (c *testCaseData) TearDown(t *testing.T) {
+	_, err := c.UnderTest.DeleteAll(c.ctx)
 	require.NoError(t, err)
-	require.NoError(t, c.db.Close())
 	c.ctxCancel()
 }
 
-func TestCreateUser(t *testing.T) {
-	c := newTestCase(t)
+func CaseCreateUser(t *testing.T, params TestCaseParams) {
+	c, ctx := newTestCase(t, params)
 
 	expected := &User{"u99", "Gordon", ptr("Gibs"), newTime("1931-09-03")}
-	_, err := c.UnderTest.Create(c.Ctx, expected)
+	_, err := c.UnderTest.Create(ctx, expected)
 	assert.NoError(t, err)
 
-	got, err := c.UnderTest.GetByID(c.Ctx, expected.ID)
+	got, err := c.UnderTest.GetByID(ctx, expected.ID)
 	assert.NoError(t, err)
 	assert.Equal(t, *expected, got)
 }
 
-func TestGetAllUsers(t *testing.T) {
-	c := newTestCase(t)
+func CaseGetAllUsers(t *testing.T, params TestCaseParams) {
+	c, ctx := newTestCase(t, params)
 
-	got, err := c.UnderTest.GetAll(c.Ctx)
+	got, err := c.UnderTest.GetAll(ctx)
 	assert.NoError(t, err)
 	assert.Equal(t, c.TestUsers, got)
 }
 
-func TestGetUserByID(t *testing.T) {
-	c := newTestCase(t)
+func CaseGetUserByID(t *testing.T, params TestCaseParams) {
+	c, ctx := newTestCase(t, params)
 
-	got, err := c.UnderTest.GetByID(c.Ctx, c.TestUsers[2].ID)
+	got, err := c.UnderTest.GetByID(ctx, c.TestUsers[2].ID)
 	assert.NoError(t, err)
 	assert.Equal(t, c.TestUsers[2], got)
 }
 
-func TestGetUsersByIDs(t *testing.T) {
-	c := newTestCase(t)
+func CaseGetUsersByIDs(t *testing.T, params TestCaseParams) {
+	c, ctx := newTestCase(t, params)
 
 	ids := []Identity{c.TestUserPtrs[1].ID, c.TestUserPtrs[2].ID}
-	got, err := c.UnderTest.GetByIDs(c.Ctx, ids)
+	got, err := c.UnderTest.GetByIDs(ctx, ids)
 	assert.NoError(t, err)
 	assert.Equal(t, []User{c.TestUsers[1], c.TestUsers[2]}, got)
 }
 
-func TestDeleteUser(t *testing.T) {
-	c := newTestCase(t)
+func CaseDeleteUser(t *testing.T, params TestCaseParams) {
+	c, ctx := newTestCase(t, params)
 
-	_, err := c.UnderTest.Delete(c.Ctx, c.TestUsers[1].ID)
+	_, err := c.UnderTest.Delete(ctx, c.TestUsers[1].ID)
 	assert.NoError(t, err)
 
-	_, err = c.UnderTest.GetByID(c.Ctx, c.TestUsers[1].ID)
+	_, err = c.UnderTest.GetByID(ctx, c.TestUsers[1].ID)
 	assert.ErrorIs(t, err, sql.ErrNoRows)
 }
 
-func TestUpdateUser(t *testing.T) {
-	c := newTestCase(t)
+func CaseUpdateUser(t *testing.T, params TestCaseParams) {
+	c, ctx := newTestCase(t, params)
 
 	updated := c.TestUserPtrs[1]
 	updated.FirstName = updated.FirstName + "_updated"
 
-	_, err := c.UnderTest.Update(c.Ctx, updated.ID, updated)
+	_, err := c.UnderTest.Update(ctx, updated.ID, updated)
 	assert.NoError(t, err)
 
-	got, err := c.UnderTest.GetByID(c.Ctx, c.TestUsers[1].ID)
+	got, err := c.UnderTest.GetByID(ctx, c.TestUsers[1].ID)
 	assert.NoError(t, err)
 	assert.Equal(t, *updated, got)
 }
 
-func TestCountUsers(t *testing.T) {
-	c := newTestCase(t)
+func CaseValidatePageRequest(t *testing.T, params TestCaseParams) {
+	c, ctx := newTestCase(t, params)
 
-	got, err := c.UnderTest.Count(c.Ctx)
-	assert.NoError(t, err)
-	assert.Equal(t, len(c.TestUserPtrs), int(got))
-}
-
-func TestCountByLastNameExists(t *testing.T) {
-	c := newTestCase(t)
-
-	got, err := c.UnderTest.CountByLastNameExists(c.Ctx)
-	assert.NoError(t, err)
-	assert.Equal(t, map[string]int{
-		"with last_name":    3,
-		"without last_name": 2,
-	}, got)
-}
-
-func TestValidatePageRequest(t *testing.T) {
-	c := newTestCase(t)
-
-	_, err := c.UnderTest.GetPage(c.Ctx, model.WithPageSize(0))
+	_, err := c.UnderTest.GetPage(ctx, model.WithPageSize(0))
 	assert.ErrorIs(t, err, model.ErrInvalidPageSize)
 }
 
-func TestGetPage(t *testing.T) {
-	c := newTestCase(t)
+func CaseGetPage(t *testing.T, params TestCaseParams) {
+	c, ctx := newTestCase(t, params)
 
-	gotPage1, err := c.UnderTest.GetPage(c.Ctx,
+	gotPage1, err := c.UnderTest.GetPage(ctx,
 		model.WithPageNumber(0), model.WithPageSize(2), model.WithSort("id"))
 	assert.NoError(t, err)
 	assert.Equal(t, model.Page[User]{
@@ -174,7 +161,7 @@ func TestGetPage(t *testing.T) {
 		Content:    c.TestUsers[0:2],
 	}, gotPage1)
 
-	gotPage2, err := c.UnderTest.GetPage(c.Ctx,
+	gotPage2, err := c.UnderTest.GetPage(ctx,
 		model.WithPageNumber(1), model.WithPageSize(2), model.WithSort("id"))
 	assert.NoError(t, err)
 	assert.Equal(t, model.Page[User]{
@@ -185,7 +172,7 @@ func TestGetPage(t *testing.T) {
 		Content:    c.TestUsers[2:4],
 	}, gotPage2)
 
-	gotPage3, err := c.UnderTest.GetPage(c.Ctx,
+	gotPage3, err := c.UnderTest.GetPage(ctx,
 		model.WithPageNumber(2), model.WithPageSize(2), model.WithSort("id"))
 	assert.NoError(t, err)
 	assert.Equal(t, model.Page[User]{
@@ -195,6 +182,25 @@ func TestGetPage(t *testing.T) {
 		TotalPages: 3,
 		Content:    c.TestUsers[4:],
 	}, gotPage3)
+}
+
+func CaseCountUsers(t *testing.T, params TestCaseParams) {
+	c, ctx := newTestCase(t, params)
+
+	got, err := c.UnderTest.Count(ctx)
+	assert.NoError(t, err)
+	assert.Equal(t, len(c.TestUserPtrs), int(got))
+}
+
+func CaseCountByLastNameExists(t *testing.T, params TestCaseParams) {
+	c, ctx := newTestCase(t, params)
+
+	got, err := c.UnderTest.CountByLastNameExists(ctx)
+	assert.NoError(t, err)
+	assert.Equal(t, map[string]int{
+		"with last_name":    3,
+		"without last_name": 2,
+	}, got)
 }
 
 type Identity string
@@ -211,19 +217,8 @@ func (u *User) String() string {
 }
 
 var (
-	dsn       = ":memory:"
-	driver    = "sqlite3"
-	tableName = "user"
+	tableName = "users"
 	idColumn  = "id"
-
-	schema = `
-CREATE TABLE IF NOT EXISTS user (
-    id TEXT NOT NULL PRIMARY KEY,
-    first_name TEXT NOT NULL,
-    last_name TEXT NULL,
-    birth_date DATETIME NOT NULL
-);
-`
 )
 
 type UserRepo struct {
@@ -231,9 +226,9 @@ type UserRepo struct {
 }
 
 const CountByLastNameExistsQuery = `
-SELECT 'with last_name' as category, COUNT(*) as cnt FROM user WHERE last_name IS NOT NULL
+SELECT 'with last_name' as category, COUNT(*) as cnt FROM users WHERE last_name IS NOT NULL
 UNION
-SELECT 'without last_name' as category, COUNT(*) as cnt FROM user WHERE last_name IS NULL;
+SELECT 'without last_name' as category, COUNT(*) as cnt FROM users WHERE last_name IS NULL;
 `
 
 type CountByLastNameExistsCategory struct {
@@ -256,7 +251,7 @@ func createTestUsers() ([]User, []*User) {
 func (r *UserRepo) CountByLastNameExists(ctx context.Context) (map[string]int, error) {
 	var counters []CountByLastNameExistsCategory
 	if err := r.SelectMany(ctx, &counters, CountByLastNameExistsQuery); err != nil {
-		return nil, fmt.Errorf("failed to select entities: %w", err)
+		return nil, fmt.Errorf("unable to select records: %w", err)
 	}
 
 	res := map[string]int{}
@@ -269,7 +264,7 @@ func (r *UserRepo) CountByLastNameExists(ctx context.Context) (map[string]int, e
 
 func createDebugFunc(t *testing.T) model.DebugFunc {
 	return func(query string, args ...any) {
-		t.Logf("Query: [%s]; Args: %+v\n", query, args)
+		t.Logf("query: [%s]; args: %+v\n", query, args)
 	}
 }
 

@@ -40,7 +40,7 @@ func NewSQLCredo[T any, I comparable](db *sql.DB, driver string, table string, i
 	return &sqlCredo[T, I]{
 		SQLExecutor:  executor,
 		CRUD:         crud.NewCRUD[T, I](tableInfo, executor, driver),
-		PageResolver: page.NewPageResolver[T](tableInfo, executor),
+		PageResolver: page.NewPageResolver[T](tableInfo, executor, driver),
 	}
 }
 

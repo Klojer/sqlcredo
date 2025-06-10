@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 
+	"gitlab.com/onrooh/sqlcredo/internal/goquext"
 	"gitlab.com/onrooh/sqlcredo/pkg/model"
 
 	"github.com/doug-martin/goqu/v9"
@@ -19,20 +20,24 @@ type CRUD[T any, I comparable] struct {
 	table         model.TableInfo
 	executor      model.SQLExecutor
 	truncateQuery string
+	dialect       goqu.DialectWrapper
 }
 
 var _ model.CRUD[any, string] = &CRUD[any, string]{}
 
-func NewCRUD[T any, I comparable](table model.TableInfo, executor model.SQLExecutor, driver string) *CRUD[T, I] {
+func NewCRUD[T any, I comparable](table model.TableInfo,
+	executor model.SQLExecutor, driver string,
+) *CRUD[T, I] {
 	return &CRUD[T, I]{
 		table:         table,
 		executor:      executor,
 		truncateQuery: createTruncateQuery(driver, table.Name),
+		dialect:       goquext.CreateDialect(driver),
 	}
 }
 
 func (r *CRUD[T, I]) GetAll(ctx context.Context) ([]T, error) {
-	query, args, err := goqu.From(r.table.Name).Prepared(true).ToSQL()
+	query, args, err := r.dialect.From(r.table.Name).Prepared(true).ToSQL()
 	if err != nil {
 		return nil, fmt.Errorf("unable to create 'select all' query: %w", err)
 	}
@@ -42,7 +47,7 @@ func (r *CRUD[T, I]) GetAll(ctx context.Context) ([]T, error) {
 func (r *CRUD[T, I]) GetByID(ctx context.Context, id I) (T, error) {
 	var record T
 
-	query, args, err := goqu.From(r.table.Name).
+	query, args, err := r.dialect.From(r.table.Name).
 		Where(goqu.I(r.table.IDColumn).Eq(id)).
 		Prepared(true).
 		ToSQL()
@@ -60,7 +65,7 @@ func (r *CRUD[T, I]) GetByID(ctx context.Context, id I) (T, error) {
 }
 
 func (r *CRUD[T, I]) GetByIDs(ctx context.Context, ids []I) ([]T, error) {
-	query, args, err := goqu.From(r.table.Name).
+	query, args, err := r.dialect.From(r.table.Name).
 		Where(goqu.I(r.table.IDColumn).In(ids)).
 		Order(goqu.I(r.table.IDColumn).Asc()).
 		Prepared(true).
@@ -78,7 +83,7 @@ func (r *CRUD[T, I]) GetByIDs(ctx context.Context, ids []I) ([]T, error) {
 }
 
 func (r *CRUD[T, I]) Create(ctx context.Context, e *T) (sql.Result, error) {
-	query, args, err := goqu.Insert(r.table.Name).
+	query, args, err := r.dialect.Insert(r.table.Name).
 		Rows(e).
 		Prepared(true).
 		ToSQL()
@@ -94,7 +99,7 @@ func (r *CRUD[T, I]) DeleteAll(ctx context.Context) (sql.Result, error) {
 }
 
 func (r *CRUD[T, I]) Delete(ctx context.Context, id I) (sql.Result, error) {
-	query, args, err := goqu.Delete(r.table.Name).
+	query, args, err := r.dialect.Delete(r.table.Name).
 		Where(goqu.I(r.table.IDColumn).Eq(id)).
 		Prepared(true).
 		ToSQL()
@@ -106,7 +111,7 @@ func (r *CRUD[T, I]) Delete(ctx context.Context, id I) (sql.Result, error) {
 }
 
 func (r *CRUD[T, I]) Update(ctx context.Context, id I, e *T) (sql.Result, error) {
-	query, args, err := goqu.Update(r.table.Name).
+	query, args, err := r.dialect.Update(r.table.Name).
 		Set(*e).
 		Where(goqu.I(r.table.IDColumn).Eq(id)).
 		Prepared(true).

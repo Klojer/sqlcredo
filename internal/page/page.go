@@ -5,13 +5,14 @@ import (
 	"fmt"
 	"math"
 
+	"gitlab.com/onrooh/sqlcredo/internal/goquext"
 	"gitlab.com/onrooh/sqlcredo/pkg/model"
 
 	"github.com/doug-martin/goqu/v9"
 )
 
 const (
-	countQueryTemplate = "SELECT COUNT(*) FROM %s;"
+	countQueryTemplate = `SELECT COUNT(%s) FROM %s;`
 )
 
 type PageResolver[T any] struct {
@@ -19,16 +20,20 @@ type PageResolver[T any] struct {
 	executor   model.SQLExecutor
 	countQuery string
 	emptyPage  model.Page[T]
+	dialect    goqu.DialectWrapper
 }
 
 var _ model.PageResolver[any] = &PageResolver[any]{}
 
-func NewPageResolver[T any](table model.TableInfo, executor model.SQLExecutor) *PageResolver[T] {
+func NewPageResolver[T any](table model.TableInfo,
+	executor model.SQLExecutor, driver string,
+) *PageResolver[T] {
 	return &PageResolver[T]{
 		table:      table,
 		executor:   executor,
-		countQuery: fmt.Sprintf(countQueryTemplate, table.Name),
+		countQuery: fmt.Sprintf(countQueryTemplate, table.IDColumn, table.Name),
 		emptyPage:  newEmptyPage[T](),
+		dialect:    goquext.CreateDialect(driver),
 	}
 }
 
@@ -68,8 +73,8 @@ func (r *PageResolver[T]) GetPage(ctx context.Context, opts ...model.PageOpt) (m
 	}, nil
 }
 
-func (r *PageResolver[T]) createPageQueryBuilder(req model.PageRequest) (string, []interface{}, error) {
-	builder := goqu.From(r.table.Name).Prepared(true)
+func (r *PageResolver[T]) createPageQueryBuilder(req model.PageRequest) (string, []any, error) {
+	builder := r.dialect.From(r.table.Name).Prepared(true)
 
 	offset := req.PageNumber * req.PageSize
 
