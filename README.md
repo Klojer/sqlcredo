@@ -32,8 +32,8 @@ import (
 
  _ "github.com/mattn/go-sqlite3"
 
- "github.com/Klojer/sqlcredo"
- "github.com/Klojer/sqlcredo/pkg/model"
+ sc "github.com/Klojer/sqlcredo"
+ scapi "github.com/Klojer/sqlcredo/pkg/api"
 )
 
 type User struct {
@@ -53,7 +53,7 @@ func main() {
 
  // Create a new SQLCredo instance
  db, _ := sql.Open("sqlite3", "test.db")
- repo := sqlcredo.NewSQLCredo[User, int](db, "sqlite3", "users", "id")
+ repo := sc.NewSQLCredo[User, int](db, "sqlite3", "users", "id")
 
  _, err := repo.InitSchema(ctx, schema)
  orPanic(err)
@@ -70,9 +70,9 @@ func main() {
 
  // Read with pagination
  page, err := repo.GetPage(ctx,
-  model.WithPageNumber(0),
-  model.WithPageSize(10),
-  model.WithSortBy("name"))
+  scapi.WithPageNumber(0),
+  scapi.WithPageSize(10),
+  scapi.WithSortBy("name"))
  orPanic(err)
  fmt.Printf("Page: %+v\n", page)
 

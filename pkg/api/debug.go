@@ -1,4 +1,4 @@
-package model
+package api
 
 type (
 	// DebugFunc is a function type used for SQL query debugging and logging.

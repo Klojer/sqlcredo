@@ -7,7 +7,7 @@ import (
 
 	"github.com/Klojer/sqlcredo/internal/goquext"
 	"github.com/Klojer/sqlcredo/internal/table"
-	"github.com/Klojer/sqlcredo/pkg/model"
+	"github.com/Klojer/sqlcredo/pkg/api"
 
 	"github.com/doug-martin/goqu/v9"
 	"github.com/doug-martin/goqu/v9/exp"
@@ -19,16 +19,16 @@ const (
 
 type PageResolver[T any] struct {
 	table      table.Info
-	executor   model.SQLExecutor
+	executor   api.SQLExecutor
 	countQuery string
-	emptyPage  model.Page[T]
+	emptyPage  api.Page[T]
 	dialect    goqu.DialectWrapper
 }
 
-var _ model.PageResolver[any] = &PageResolver[any]{}
+var _ api.PageResolver[any] = &PageResolver[any]{}
 
 func NewPageResolver[T any](table table.Info,
-	executor model.SQLExecutor, driver string,
+	executor api.SQLExecutor, driver string,
 ) *PageResolver[T] {
 	return &PageResolver[T]{
 		table:      table,
@@ -39,7 +39,7 @@ func NewPageResolver[T any](table table.Info,
 	}
 }
 
-func (r *PageResolver[T]) GetPage(ctx context.Context, opts ...model.PageOpt) (model.Page[T], error) {
+func (r *PageResolver[T]) GetPage(ctx context.Context, opts ...api.PageOpt) (api.Page[T], error) {
 	req, err := newPageParams(r.table.IDColumn, opts...)
 	if err != nil {
 		return r.emptyPage, fmt.Errorf("unable to create page request: %w", err)
@@ -66,7 +66,7 @@ func (r *PageResolver[T]) GetPage(ctx context.Context, opts ...model.PageOpt) (m
 
 	totalPages := uint(math.Ceil(float64(totalRecords) / float64(req.PageSize)))
 
-	return model.Page[T]{
+	return api.Page[T]{
 		Number:     req.PageNumber,
 		Size:       uint(len(pageRecords)),
 		Total:      totalRecords,
@@ -75,7 +75,7 @@ func (r *PageResolver[T]) GetPage(ctx context.Context, opts ...model.PageOpt) (m
 	}, nil
 }
 
-func (r *PageResolver[T]) createPageQueryBuilder(params model.PageParams) (string, []any, error) {
+func (r *PageResolver[T]) createPageQueryBuilder(params api.PageParams) (string, []any, error) {
 	builder := r.dialect.From(r.table.Name).Prepared(true)
 	builder = builder.Offset(params.PageNumber * params.PageSize)
 	builder = builder.Limit(params.PageSize)
@@ -83,7 +83,7 @@ func (r *PageResolver[T]) createPageQueryBuilder(params model.PageParams) (strin
 	return builder.ToSQL()
 }
 
-func buildOrderExprs(params model.PageParams) []exp.OrderedExpression {
+func buildOrderExprs(params api.PageParams) []exp.OrderedExpression {
 	orderExprs := make([]exp.OrderedExpression, 0, len(params.SortBy))
 	for _, s := range params.SortBy {
 		if params.SortDesc {
@@ -111,8 +111,8 @@ func (r *PageResolver[T]) selectMany(ctx context.Context, query string, args ...
 	return records, nil
 }
 
-func newPageParams(idColumn string, opts ...model.PageOpt) (model.PageParams, error) {
-	params := model.PageParams{
+func newPageParams(idColumn string, opts ...api.PageOpt) (api.PageParams, error) {
+	params := api.PageParams{
 		PageNumber: 0,
 		PageSize:   10,
 		SortDesc:   false,
@@ -123,7 +123,7 @@ func newPageParams(idColumn string, opts ...model.PageOpt) (model.PageParams, er
 	}
 
 	if err := params.Validate(); err != nil {
-		return model.PageParams{}, fmt.Errorf("invalid page params: %w", err)
+		return api.PageParams{}, fmt.Errorf("invalid page params: %w", err)
 	}
 
 	if params.SortBy == nil {
@@ -133,8 +133,8 @@ func newPageParams(idColumn string, opts ...model.PageOpt) (model.PageParams, er
 	return params, nil
 }
 
-func newEmptyPage[T any]() model.Page[T] {
-	return model.Page[T]{
+func newEmptyPage[T any]() api.Page[T] {
+	return api.Page[T]{
 		Number:     0,
 		Size:       0,
 		Total:      0,

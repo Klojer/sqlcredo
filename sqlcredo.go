@@ -9,7 +9,7 @@ import (
 	"github.com/Klojer/sqlcredo/internal/page"
 	"github.com/Klojer/sqlcredo/internal/sqlexec"
 	"github.com/Klojer/sqlcredo/internal/table"
-	"github.com/Klojer/sqlcredo/pkg/model"
+	"github.com/Klojer/sqlcredo/pkg/api"
 
 	"github.com/jmoiron/sqlx"
 )
@@ -21,9 +21,9 @@ import (
 //   - T: The entity type being managed (can be any type)
 //   - I: The type of the entity's ID field (must be comparable)
 type SQLCredo[T any, I comparable] interface {
-	model.SQLExecutor
-	model.CRUD[T, I]
-	model.PageResolver[T]
+	api.SQLExecutor
+	api.CRUD[T, I]
+	api.PageResolver[T]
 
 	// InitSchema executes a SQL query to initialize the database schema.
 	// Typically used for creating tables and other database objects.
@@ -32,11 +32,11 @@ type SQLCredo[T any, I comparable] interface {
 	// WithDebugFunc sets a debug function for SQL query logging.
 	// The debug function will be called before executing any SQL query.
 	// Returns the modified SQLCredo instance for method chaining.
-	WithDebugFunc(newDebugFunc model.DebugFunc) SQLCredo[T, I]
+	WithDebugFunc(newDebugFunc api.DebugFunc) SQLCredo[T, I]
 
 	// GetDebugFunc returns the currently set debug function.
 	// Returns nil if no debug function is set.
-	GetDebugFunc() model.DebugFunc
+	GetDebugFunc() api.DebugFunc
 }
 
 type sqlCredo[T any, I comparable] struct {
@@ -82,13 +82,13 @@ func (r *sqlCredo[T, I]) InitSchema(ctx context.Context, sql string) (sql.Result
 // WithDebugFunc sets a new debug function for SQL query logging.
 // The debug function will be called before executing any SQL query,
 // allowing for query inspection and logging.
-func (r *sqlCredo[T, I]) WithDebugFunc(newDebugFunc model.DebugFunc) SQLCredo[T, I] {
+func (r *sqlCredo[T, I]) WithDebugFunc(newDebugFunc api.DebugFunc) SQLCredo[T, I] {
 	r.DebugFunc = newDebugFunc
 	return r
 }
 
 // GetDebugFunc returns the currently set debug function.
 // Returns nil if no debug function has been set.
-func (r *sqlCredo[T, I]) GetDebugFunc() model.DebugFunc {
+func (r *sqlCredo[T, I]) GetDebugFunc() api.DebugFunc {
 	return r.DebugFunc
 }

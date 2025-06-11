@@ -7,7 +7,7 @@ import (
 	"time"
 
 	sc "github.com/Klojer/sqlcredo"
-	"github.com/Klojer/sqlcredo/pkg/model"
+	"github.com/Klojer/sqlcredo/pkg/api"
 )
 
 const (
@@ -32,7 +32,7 @@ type Repo struct {
 	sc.SQLCredo[Object, Identity]
 }
 
-func NewRepo(db *sql.DB, driver string, debugFunc model.DebugFunc) *Repo {
+func NewRepo(db *sql.DB, driver string, debugFunc api.DebugFunc) *Repo {
 	return &Repo{
 		SQLCredo: sc.NewSQLCredo[Object, Identity](db, driver, TableName, IDColumn).
 			WithDebugFunc(debugFunc),

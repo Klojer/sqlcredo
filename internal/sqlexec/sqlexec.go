@@ -5,17 +5,17 @@ import (
 	"database/sql"
 	"fmt"
 
-	"github.com/Klojer/sqlcredo/pkg/model"
+	"github.com/Klojer/sqlcredo/pkg/api"
 
 	"github.com/jmoiron/sqlx"
 )
 
 type SQLExecutor struct {
 	db        *sqlx.DB
-	DebugFunc model.DebugFunc
+	DebugFunc api.DebugFunc
 }
 
-var _ model.SQLExecutor = &SQLExecutor{}
+var _ api.SQLExecutor = &SQLExecutor{}
 
 func NewSQLExecutor(db *sqlx.DB) *SQLExecutor {
 	return &SQLExecutor{

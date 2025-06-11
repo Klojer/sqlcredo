@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/Klojer/sqlcredo/examples/users"
-	"github.com/Klojer/sqlcredo/pkg/model"
+	"github.com/Klojer/sqlcredo/pkg/api"
 )
 
 type TestCaseDesc struct {
@@ -157,17 +157,17 @@ func CaseUpdateUser(t *testing.T, params TestCaseParams) {
 func CaseValidatePageRequest(t *testing.T, params TestCaseParams) {
 	c, ctx := newTestCase(t, params)
 
-	_, err := c.UnderTest.GetPage(ctx, model.WithPageSize(0))
-	assert.ErrorIs(t, err, model.ErrInvalidPageSize)
+	_, err := c.UnderTest.GetPage(ctx, api.WithPageSize(0))
+	assert.ErrorIs(t, err, api.ErrInvalidPageSize)
 }
 
 func CaseGetPage(t *testing.T, params TestCaseParams) {
 	c, ctx := newTestCase(t, params)
 
 	gotPage1, err := c.UnderTest.GetPage(ctx,
-		model.WithPageNumber(0), model.WithPageSize(2))
+		api.WithPageNumber(0), api.WithPageSize(2))
 	assert.NoError(t, err)
-	assert.Equal(t, model.Page[users.Object]{
+	assert.Equal(t, api.Page[users.Object]{
 		Number:     0,
 		Size:       2,
 		Total:      5,
@@ -176,9 +176,9 @@ func CaseGetPage(t *testing.T, params TestCaseParams) {
 	}, gotPage1)
 
 	gotPage2, err := c.UnderTest.GetPage(ctx,
-		model.WithPageNumber(1), model.WithPageSize(2))
+		api.WithPageNumber(1), api.WithPageSize(2))
 	assert.NoError(t, err)
-	assert.Equal(t, model.Page[users.Object]{
+	assert.Equal(t, api.Page[users.Object]{
 		Number:     1,
 		Size:       2,
 		Total:      5,
@@ -187,9 +187,9 @@ func CaseGetPage(t *testing.T, params TestCaseParams) {
 	}, gotPage2)
 
 	gotPage3, err := c.UnderTest.GetPage(ctx,
-		model.WithPageNumber(2), model.WithPageSize(2))
+		api.WithPageNumber(2), api.WithPageSize(2))
 	assert.NoError(t, err)
-	assert.Equal(t, model.Page[users.Object]{
+	assert.Equal(t, api.Page[users.Object]{
 		Number:     2,
 		Size:       1,
 		Total:      5,
@@ -202,10 +202,10 @@ func CaseGetPageCustomOrder(t *testing.T, params TestCaseParams) {
 	c, ctx := newTestCase(t, params)
 
 	gotPage, err := c.UnderTest.GetPage(ctx,
-		model.WithPageNumber(0),
-		model.WithPageSize(uint(len(c.TestUsers))),
-		model.WithSortBy("first_name"),
-		model.WithSortBy("last_name"),
+		api.WithPageNumber(0),
+		api.WithPageSize(uint(len(c.TestUsers))),
+		api.WithSortBy("first_name"),
+		api.WithSortBy("last_name"),
 	)
 	assert.NoError(t, err)
 	assert.Equal(t, strings.TrimSpace(`
@@ -237,7 +237,7 @@ func CaseCountByLastNameExists(t *testing.T, params TestCaseParams) {
 	}, got)
 }
 
-func createDebugFunc(t *testing.T) model.DebugFunc {
+func createDebugFunc(t *testing.T) api.DebugFunc {
 	return func(query string, args ...any) {
 		t.Logf("query: [%s]; args: %+v\n", query, args)
 	}
