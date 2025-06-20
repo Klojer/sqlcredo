@@ -31,6 +31,15 @@ jobs:
             subdir/go.sum
             tools/go.sum
 
+      - name: Go Tidy
+        run: go mod tidy && git diff --exit-code
+
+      - name: Go Mod
+        run: go mod download
+
+      - name: Go Mod Verify
+        run: go mod verify
+
       - name: Build
         run: go build -v ./...
 
