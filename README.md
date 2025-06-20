@@ -1,6 +1,8 @@
 
 # SQLCredo
 
+[![Go report](https://goreportcard.com/badge/github.com/Klojer/sqlcredo)](https://goreportcard.com/badge/github.com/Klojer/sqlcredo)
+
 SQLCredo is a type-safe generic SQL CRUD operations wrapper for Go, built on top of [sqlx](https://github.com/jmoiron/sqlx) and [goqu](https://github.com/doug-martin/goqu).
 
 The idea of the package to provide basic CRUD and pagination operations out of the box and simplify adding custom raw SQL-queries to extend functionality.
