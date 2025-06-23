@@ -23,7 +23,7 @@ test: dependencies
 	go test -v -race -shuffle=on ./...
 
 test-cov: test
-	go test -v -coverprofile cover.out ./...
+	go test -v -coverprofile=cover.out $(shell go list ./... | grep -v /internal/mocks)
 	go tool cover -html cover.out -o cover.html
 	xdg-open cover.html
 
