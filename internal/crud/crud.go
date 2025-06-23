@@ -33,7 +33,7 @@ func NewCRUD[T any, I comparable](table table.Info,
 		table:         table,
 		executor:      executor,
 		truncateQuery: createTruncateQuery(driver, table.Name),
-		dialect:       goquext.CreateDialect(driver),
+		dialect:       goqu.Dialect(goquext.CreateDialectString(driver)),
 	}
 }
 
