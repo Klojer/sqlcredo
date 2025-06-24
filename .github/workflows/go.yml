@@ -27,9 +27,6 @@ jobs:
         with:
           go-version: ${{ matrix.go }}
           check-latest: true
-          cache-dependency-path: |
-            subdir/go.sum
-            tools/go.sum
 
       - name: Go Tidy
         run: go mod tidy && git diff --exit-code
