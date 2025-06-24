@@ -1,4 +1,4 @@
-package sqlcredo_test
+package users_test
 
 import (
 	"database/sql"

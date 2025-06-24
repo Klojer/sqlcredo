@@ -35,7 +35,7 @@ func NewPageResolver[T any](table table.Info,
 		executor:   executor,
 		countQuery: fmt.Sprintf(countQueryTemplate, table.IDColumn, table.Name),
 		emptyPage:  newEmptyPage[T](),
-		dialect:    goquext.CreateDialect(driver),
+		dialect:    goqu.Dialect(goquext.CreateDialectString(driver)),
 	}
 }
 

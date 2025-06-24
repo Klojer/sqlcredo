@@ -20,7 +20,12 @@ install-git-hooks:
 	pre-commit install
 
 test: dependencies
-	go test -v ./...
+	go test -v -race -shuffle=on ./...
+
+test-cov: test
+	go test -v -coverprofile=cover.out $(shell go list ./... | grep -v /internal/mocks)
+	go tool cover -html cover.out -o cover.html
+	xdg-open cover.html
 
 lint: install-golangci-lint dependencies
 	golangci-lint run ./...
