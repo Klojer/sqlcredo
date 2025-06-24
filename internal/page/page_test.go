@@ -11,24 +11,32 @@ import (
 	"github.com/Klojer/sqlcredo/pkg/api"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 func TestPageResolver_GetPage(t *testing.T) {
 	c, ctx := newTestCase(t)
+	c.Executor.On("SelectMany", ctx, mock.Anything,
+		"SELECT * FROM `test_table` ORDER BY `id` ASC LIMIT ?", []any{int64(10)}).
+		Return(nil)
+	c.Executor.On("SelectOne", ctx, mock.Anything,
+		"SELECT COUNT(id) FROM test_table;", mock.Anything).
+		Return(nil)
 
 	_, err := c.UnderTest.GetPage(ctx, api.WithPageNumber(0), api.WithPageSize(10))
+
 	assert.NoError(t, err)
-	assert.Equal(t, c.Executor.Queries[0], "SELECT * FROM `test_table` ORDER BY `id` ASC LIMIT ?")
-	assert.Equal(t, c.Executor.Args[0], []any{int64(10)})
 }
 
 func TestPageResolver_Count(t *testing.T) {
 	c, ctx := newTestCase(t)
+	c.Executor.On("SelectOne", ctx, mock.Anything,
+		"SELECT COUNT(id) FROM test_table;", mock.Anything).
+		Return(nil)
 
 	_, err := c.UnderTest.Count(ctx)
+
 	assert.NoError(t, err)
-	assert.Equal(t, c.Executor.Queries[0], "SELECT COUNT(id) FROM test_table;")
-	assert.Nil(t, c.Executor.Args[0])
 }
 
 type testCaseData struct {
@@ -40,6 +48,8 @@ type testCaseData struct {
 }
 
 func newTestCase(t *testing.T) (*testCaseData, context.Context) {
+	t.Helper()
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 
 	executor := mocks.NewSQLExecutor()
@@ -61,6 +71,9 @@ func newTestCase(t *testing.T) (*testCaseData, context.Context) {
 }
 
 func (c *testCaseData) TearDown(t *testing.T) {
+	t.Helper()
+
+	c.Executor.AssertExpectations(t)
 	c.ctxCancel()
 }
 
