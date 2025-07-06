@@ -34,13 +34,13 @@ func NewPageResolver[T any](table table.Info,
 		table:      table,
 		executor:   executor,
 		countQuery: fmt.Sprintf(countQueryTemplate, table.IDColumn, table.Name),
-		emptyPage:  newEmptyPage[T](),
+		emptyPage:  api.NewEmptyPage[T](),
 		dialect:    goqu.Dialect(goquext.CreateDialectString(driver)),
 	}
 }
 
 func (r *PageResolver[T]) GetPage(ctx context.Context, opts ...api.PageOpt) (api.Page[T], error) {
-	req, err := newPageParams(r.table.IDColumn, opts...)
+	req, err := api.NewPageParams(r.table.IDColumn, opts...)
 	if err != nil {
 		return r.emptyPage, fmt.Errorf("unable to create page request: %w", err)
 	}
@@ -109,36 +109,4 @@ func (r *PageResolver[T]) selectMany(ctx context.Context, query string, args ...
 		return nil, fmt.Errorf("unable to load page records: %w", err)
 	}
 	return records, nil
-}
-
-func newPageParams(idColumn string, opts ...api.PageOpt) (api.PageParams, error) {
-	params := api.PageParams{
-		PageNumber: 0,
-		PageSize:   10,
-		SortDesc:   false,
-	}
-
-	for _, o := range opts {
-		o(&params)
-	}
-
-	if err := params.Validate(); err != nil {
-		return api.PageParams{}, fmt.Errorf("invalid page params: %w", err)
-	}
-
-	if params.SortBy == nil {
-		params.SortBy = []string{idColumn}
-	}
-
-	return params, nil
-}
-
-func newEmptyPage[T any]() api.Page[T] {
-	return api.Page[T]{
-		Number:     0,
-		Size:       0,
-		Total:      0,
-		TotalPages: 0,
-		Content:    nil,
-	}
 }

@@ -5,6 +5,12 @@ import (
 	"fmt"
 )
 
+const (
+	DefaultPageNumber = 0
+	DefaultPageSize   = 10
+	DefaultSortDesc   = false
+)
+
 // Page represents a paginated result set containing items of type T.
 // It includes metadata about the current page, total items, and the actual content.
 type Page[T any] struct {
@@ -26,6 +32,30 @@ type PageParams struct {
 // PageOpt is a function type that modifies PageParams.
 // It follows the functional options pattern for configuring pagination parameters.
 type PageOpt func(*PageParams)
+
+// NewPageParams creates a new PageParams with the given options and validate it.
+// If no SortBy specified the idColumn will be used for sorting.
+func NewPageParams(idColumn string, opts ...PageOpt) (PageParams, error) {
+	params := PageParams{
+		PageNumber: DefaultPageNumber,
+		PageSize:   DefaultPageSize,
+		SortDesc:   DefaultSortDesc,
+	}
+
+	for _, o := range opts {
+		o(&params)
+	}
+
+	if err := params.Validate(); err != nil {
+		return PageParams{}, fmt.Errorf("invalid page params: %w", err)
+	}
+
+	if params.SortBy == nil {
+		params.SortBy = []string{idColumn}
+	}
+
+	return params, nil
+}
 
 func (p PageParams) Validate() error {
 	if p.PageSize <= 0 {
@@ -79,4 +109,15 @@ type PageResolver[T any] interface {
 	// Count returns the total number of items available across all pages.
 	// This is useful for calculating total pages and displaying pagination metadata.
 	Count(ctx context.Context) (uint64, error)
+}
+
+// NewEmptyPage creates a page with no content and zero counters.
+func NewEmptyPage[T any]() Page[T] {
+	return Page[T]{
+		Number:     0,
+		Size:       0,
+		Total:      0,
+		TotalPages: 0,
+		Content:    nil,
+	}
 }
