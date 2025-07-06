@@ -31,6 +31,45 @@ func TestPageParams_Validate(t *testing.T) {
 	}
 }
 
+func TestNewPageParams(t *testing.T) {
+	testCases := []struct {
+		desc    string
+		opts    []api.PageOpt
+		want    api.PageParams
+		wantErr bool
+	}{
+		{
+			desc: "no options",
+			opts: nil,
+			want: api.PageParams{
+				PageNumber: api.DefaultPageNumber,
+				PageSize:   api.DefaultPageSize,
+				SortBy:     []string{"testId"},
+				SortDesc:   api.DefaultSortDesc,
+			},
+		},
+		{
+			desc:    "invalid opts",
+			opts:    []api.PageOpt{api.WithPageSize(0)},
+			want:    api.PageParams{},
+			wantErr: true,
+		},
+	}
+	for _, tC := range testCases {
+		t.Run(tC.desc, func(t *testing.T) {
+			got, gotErr := api.NewPageParams("testId", tC.opts...)
+
+			if tC.wantErr {
+				assert.Error(t, gotErr)
+				assert.Equal(t, api.PageParams{}, got)
+			} else {
+				assert.NoError(t, gotErr)
+				assert.Equal(t, tC.want, got)
+			}
+		})
+	}
+}
+
 func TestWithPageNumber(t *testing.T) {
 	params := &api.PageParams{}
 	pageNumber := uint(2)
@@ -64,4 +103,10 @@ func TestWithSortDesc(t *testing.T) {
 	api.WithSortDesc("name")(params)
 
 	assert.True(t, params.SortDesc)
+}
+
+func TestNewEmptyPage(t *testing.T) {
+	got := api.NewEmptyPage[string]()
+
+	assert.Equal(t, api.Page[string]{}, got)
 }

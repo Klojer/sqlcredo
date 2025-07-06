@@ -42,7 +42,7 @@ func NewPageResolver[T any](table table.Info,
 func (r *PageResolver[T]) GetPage(ctx context.Context, opts ...api.PageOpt) (api.Page[T], error) {
 	req, err := api.NewPageParams(r.table.IDColumn, opts...)
 	if err != nil {
-		return r.emptyPage, fmt.Errorf("unable to create page request: %w", err)
+		return r.emptyPage, fmt.Errorf("unable to create page params: %w", err)
 	}
 
 	query, args, err := r.createPageQueryBuilder(req)

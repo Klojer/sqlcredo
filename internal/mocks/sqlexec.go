@@ -10,8 +10,16 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
+type (
+	OnExecCb   func(ctx context.Context, query string, args ...any)
+	OnSelectCb func(ctx context.Context, dest any, query string, args ...any)
+)
+
 type SQLExecutor struct {
 	mock.Mock
+	onExecCb       OnExecCb
+	onSelectOneCb  OnSelectCb
+	onSelectManyCb OnSelectCb
 }
 
 var _ api.SQLExecutor = &SQLExecutor{}
@@ -22,21 +30,42 @@ func NewSQLExecutor() *SQLExecutor {
 
 func (m *SQLExecutor) Exec(ctx context.Context, query string, args ...any) (sql.Result, error) {
 	mockArgs := m.Called(ctx, query, args)
+	if m.onExecCb != nil {
+		m.onExecCb(ctx, query, args...)
+	}
 	return mockArgs.Get(0).(sql.Result), mockArgs.Error(1)
 }
 
 func (m *SQLExecutor) SelectOne(ctx context.Context, dest any, query string, args ...any) error {
 	mockArgs := m.Called(ctx, dest, query, args)
+	if m.onSelectOneCb != nil {
+		m.onSelectOneCb(ctx, dest, query, args...)
+	}
 	return mockArgs.Error(0)
 }
 
 func (m *SQLExecutor) SelectMany(ctx context.Context, dest any, query string, args ...any) error {
 	mockArgs := m.Called(ctx, dest, query, args)
+	if m.onSelectManyCb != nil {
+		m.onSelectManyCb(ctx, dest, query, args...)
+	}
 	return mockArgs.Error(0)
 }
 
 func (m *SQLExecutor) BeginTx(ctx context.Context, opts *sql.TxOptions) (*sql.Tx, error) {
 	return nil, errors.New("not implemented")
+}
+
+func (m *SQLExecutor) SetOnExecCb(cb OnExecCb) {
+	m.onExecCb = cb
+}
+
+func (m *SQLExecutor) SetOnSelectOneCb(cb OnSelectCb) {
+	m.onSelectOneCb = cb
+}
+
+func (m *SQLExecutor) SetOnSelectManyCb(cb OnSelectCb) {
+	m.onSelectManyCb = cb
 }
 
 type SQLResult struct {
