@@ -3,6 +3,7 @@
 
 [![GoDoc](https://godoc.org/github.com/Klojer/sqlcredo?status.svg)](https://godoc.org/github.com/Klojer/sqlcredo)
 [![Go report](https://goreportcard.com/badge/github.com/Klojer/sqlcredo)](https://goreportcard.com/badge/github.com/Klojer/sqlcredo)
+[![codecov](https://codecov.io/gh/Klojer/sqlcredo/branch/main/graph/badge.svg?token=XE7N0Q2106)](https://codecov.io/gh/Klojer/sqlcredo)
 
 SQLCredo is a type-safe generic SQL CRUD operations wrapper for Go, built on top of [sqlx](https://github.com/jmoiron/sqlx) and [goqu](https://github.com/doug-martin/goqu).
 
