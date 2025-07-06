@@ -13,7 +13,7 @@ install-golangci-lint:
 	else \
 		echo 'golangci-lint binary not found, downloading'; \
 		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | \
-		sh -s -- -b $(shell go env GOPATH)/bin v1.54.1; \
+		sh -s -- -b $(shell go env GOPATH)/bin v2.1.6; \
 	fi
 
 install-git-hooks:
