@@ -22,7 +22,7 @@ install-git-hooks:
 test: dependencies
 	go test -v -race -shuffle=on ./...
 
-test-cov: test
+test-cov:
 	go test -v -coverprofile=cover.out $(shell go list ./... | grep -v /internal/mocks)
 	go tool cover -html cover.out -o cover.html
 	xdg-open cover.html
