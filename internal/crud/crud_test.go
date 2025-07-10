@@ -25,6 +25,17 @@ func TestCRUD_GetAll(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestCRUD_GetAll_DatabaseError(t *testing.T) {
+	c, ctx := newTestCase(t)
+	c.Executor.On("SelectMany", ctx, mock.Anything, "SELECT * FROM `test_table`", mock.Anything).
+		Return(fmt.Errorf("database error"))
+
+	_, err := c.UnderTest.GetAll(ctx)
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "unable to load records")
+}
+
 func TestCRUD_GetByID(t *testing.T) {
 	c, ctx := newTestCase(t)
 	c.Executor.On("SelectOne", ctx, mock.Anything,
@@ -36,7 +47,7 @@ func TestCRUD_GetByID(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestCRUD_GetByID_Error(t *testing.T) {
+func TestCRUD_GetByID_DatabaseError(t *testing.T) {
 	c, ctx := newTestCase(t)
 	c.Executor.On("SelectOne", ctx, mock.Anything,
 		"SELECT * FROM `test_table` WHERE (`id` = ?)", []any{"non_existent_id"}).
@@ -73,24 +84,38 @@ func TestCRUD_GetByIDs_NoMatch(t *testing.T) {
 	assert.Empty(t, result)
 }
 
+func TestCRUD_GetByIDs_DatabaseError(t *testing.T) {
+	c, ctx := newTestCase(t)
+	c.Executor.On("SelectMany", ctx, mock.Anything,
+		"SELECT * FROM `test_table` WHERE (`id` IN (?, ?, ?)) ORDER BY `id` ASC",
+		[]any{"0", "3", "16"}).
+		Return(fmt.Errorf("select error"))
+
+	_, err := c.UnderTest.GetByIDs(ctx, []string{"0", "3", "16"})
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "select error")
+}
+
 func TestCRUD_Create(t *testing.T) {
 	c, ctx := newTestCase(t)
 	c.Executor.On("Exec", ctx,
 		"INSERT INTO `test_table` (`id`, `name`) VALUES (?, ?)", []any{"12", "test12"}).
 		Return(mocks.NewSQLResult(1, 1), nil)
 
-	_, err := c.UnderTest.Create(ctx, &testObj{Id: "12", Name: "test12"})
+	_, err := c.UnderTest.Create(ctx, &testObj{ID: "12", Name: "test12"})
 
 	assert.NoError(t, err)
 }
 
-func TestCRUD_Create_Error(t *testing.T) {
+func TestCRUD_Create_DatabaseError(t *testing.T) {
 	c, ctx := newTestCase(t)
 	c.Executor.On("Exec", ctx,
-		"INSERT INTO `test_table` (`id`, `name`) VALUES (?, ?)", []any{"12", "test12"}).
+		"INSERT INTO `test_table` (`id`, `name`) VALUES (?, ?)",
+		[]any{"12", "test12"}).
 		Return(mocks.NewSQLResult(-1, -1), fmt.Errorf("insert error"))
 
-	_, err := c.UnderTest.Create(ctx, &testObj{Id: "12", Name: "test12"})
+	_, err := c.UnderTest.Create(ctx, &testObj{ID: "12", Name: "test12"})
 
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "insert error")
@@ -106,6 +131,18 @@ func TestCRUD_DeleteAll(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestCRUD_DeleteAll_DatabaseError(t *testing.T) {
+	c, ctx := newTestCase(t)
+
+	c.Executor.On("Exec", ctx, "DELETE FROM test_table;", mock.Anything).
+		Return(mocks.NewSQLResult(-1, -1), fmt.Errorf("database error"))
+
+	_, err := c.UnderTest.DeleteAll(ctx)
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "database error")
+}
+
 func TestCRUD_Delete(t *testing.T) {
 	c, ctx := newTestCase(t)
 	c.Executor.On("Exec", ctx,
@@ -115,6 +152,20 @@ func TestCRUD_Delete(t *testing.T) {
 	_, err := c.UnderTest.Delete(ctx, "test_id")
 
 	assert.NoError(t, err)
+}
+
+func TestCRUD_Delete_NonExistentID(t *testing.T) {
+	c, ctx := newTestCase(t)
+
+	c.Executor.On("Exec", ctx,
+		"DELETE FROM `test_table` WHERE (`id` = ?)",
+		[]any{"non_existent_id"}).
+		Return(mocks.NewSQLResult(-1, -1), fmt.Errorf("delete error"))
+
+	_, err := c.UnderTest.Delete(ctx, "non_existent_id")
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "delete error")
 }
 
 func TestCRUD_Delete_NonExistent(t *testing.T) {
@@ -132,12 +183,27 @@ func TestCRUD_Delete_NonExistent(t *testing.T) {
 func TestCRUD_Update(t *testing.T) {
 	c, ctx := newTestCase(t)
 	c.Executor.On("Exec", ctx,
-		"UPDATE `test_table` SET `id`=?,`name`=? WHERE (`id` = ?)", []any{"12", "new name", "12"}).
+		"UPDATE `test_table` SET `id`=?,`name`=? WHERE (`id` = ?)",
+		[]any{"12", "new name", "12"}).
 		Return(mocks.NewSQLResult(1, 1), nil)
 
-	_, err := c.UnderTest.Update(ctx, "12", &testObj{Id: "12", Name: "new name"})
+	_, err := c.UnderTest.Update(ctx, "12", &testObj{ID: "12", Name: "new name"})
 
 	assert.NoError(t, err)
+}
+
+func TestCRUD_Update_NonExistentID(t *testing.T) {
+	c, ctx := newTestCase(t)
+	c.Executor.On("Exec", ctx,
+		"UPDATE `test_table` SET `id`=?,`name`=? WHERE (`id` = ?)",
+		[]any{"non_existent_id", "updated_name", "non_existent_id"}).
+		Return(mocks.NewSQLResult(-1, -1), fmt.Errorf("update error"))
+
+	updateObj := &testObj{ID: "non_existent_id", Name: "updated_name"}
+	_, err := c.UnderTest.Update(ctx, "non_existent_id", updateObj)
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "update error")
 }
 
 func TestCRUD_Update_NonExistent(t *testing.T) {
@@ -148,7 +214,7 @@ func TestCRUD_Update_NonExistent(t *testing.T) {
 		Return(mocks.NewSQLResult(-1, -1), fmt.Errorf("update error"))
 
 	_, err := c.UnderTest.Update(ctx, "non_existent_id",
-		&testObj{Id: "non_existent_id", Name: "new name"})
+		&testObj{ID: "non_existent_id", Name: "new name"})
 
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "update error")
@@ -193,6 +259,6 @@ func (c *testCaseData) TearDown(t *testing.T) {
 }
 
 type testObj struct {
-	Id   string `db:"id"`
+	ID   string `db:"id"`
 	Name string `db:"name"`
 }
