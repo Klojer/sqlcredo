@@ -2,6 +2,7 @@ package sqlexec_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -61,17 +62,64 @@ func TestSQLExecutor_BeginTx(t *testing.T) {
 	assert.NotNil(t, tx)
 }
 
+func TestSQLExecutor_SelectOne_Error(t *testing.T) {
+	c, ctx := newTestCase(t)
+
+	query := "SELECT name FROM users WHERE id = ?"
+	c.Mock.ExpectQuery(query).WithArgs(1).
+		WillReturnError(fmt.Errorf("query error"))
+
+	var name string
+	err := c.UnderTest.SelectOne(ctx, &name, query, 1)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "unable to get data from db")
+}
+
+func TestSQLExecutor_SelectMany_Error(t *testing.T) {
+	c, ctx := newTestCase(t)
+
+	query := "SELECT name FROM users"
+	c.Mock.ExpectQuery(query).WillReturnError(fmt.Errorf("query error"))
+
+	var names []string
+	err := c.UnderTest.SelectMany(ctx, &names, query)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "unable to select data from db")
+}
+
+func TestSQLExecutor_Exec_Error(t *testing.T) {
+	c, ctx := newTestCase(t)
+
+	query := "INSERT INTO users (name) VALUES (?)"
+	c.Mock.ExpectExec(query).WithArgs("John Doe").
+		WillReturnError(fmt.Errorf("execution error"))
+
+	_, err := c.UnderTest.Exec(ctx, query, "John Doe")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "unable to exec db query")
+}
+
+func TestSQLExecutor_BeginTx_Error(t *testing.T) {
+	c, ctx := newTestCase(t)
+
+	c.Mock.ExpectBegin().
+		WillReturnError(fmt.Errorf("transaction error"))
+
+	tx, err := c.UnderTest.BeginTx(ctx, nil)
+	assert.Error(t, err)
+	assert.Nil(t, tx)
+	assert.Contains(t, err.Error(), "transaction error")
+}
+
 type testCaseData struct {
 	ctx       context.Context
 	ctxCancel func()
-
 	Mock      sqlmock.Sqlmock
 	UnderTest *sqlexec.SQLExecutor
 }
 
 func newTestCase(t *testing.T) (*testCaseData, context.Context) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
 
@@ -81,7 +129,6 @@ func newTestCase(t *testing.T) (*testCaseData, context.Context) {
 	c := &testCaseData{
 		ctx:       ctx,
 		ctxCancel: cancel,
-
 		Mock:      mock,
 		UnderTest: executor,
 	}
