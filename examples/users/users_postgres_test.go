@@ -48,6 +48,7 @@ func TestPostgres(t *testing.T) {
 		{name: "get-page-custom-order", run: CaseGetPageCustomOrder},
 		{name: "count-users", run: CaseCountUsers},
 		{name: "count-by-last-name-exists", run: CaseCountByLastNameExists},
+		{name: "count-by-last-name-exists-ctx-err", run: CaseCountByLastNameExistsCtxError},
 	}
 	for _, tC := range testCases {
 		t.Run(tC.name, func(t *testing.T) {

@@ -237,6 +237,16 @@ func CaseCountByLastNameExists(t *testing.T, params TestCaseParams) {
 	}, got)
 }
 
+func CaseCountByLastNameExistsCtxError(t *testing.T, params TestCaseParams) {
+	c, ctx := newTestCase(t, params)
+	newCtx, cancel := context.WithCancel(ctx)
+	cancel()
+
+	_, err := c.UnderTest.CountByLastNameExists(newCtx)
+	assert.Error(t, err)
+	assert.ErrorContains(t, err, "unable to select records")
+}
+
 func createDebugFunc(t *testing.T) api.DebugFunc {
 	return func(query string, args ...any) {
 		t.Logf("query: [%s]; args: %+v\n", query, args)
