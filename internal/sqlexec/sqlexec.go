@@ -6,18 +6,22 @@ import (
 	"fmt"
 
 	"github.com/Klojer/sqlcredo/pkg/api"
-
-	"github.com/jmoiron/sqlx"
 )
 
+type SQLXExecutor interface {
+	GetContext(ctx context.Context, dest any, query string, args ...any) error
+	SelectContext(ctx context.Context, dest any, query string, args ...any) error
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+}
+
 type SQLExecutor struct {
-	db        *sqlx.DB
+	db        SQLXExecutor
 	DebugFunc api.DebugFunc
 }
 
 var _ api.SQLExecutor = &SQLExecutor{}
 
-func NewSQLExecutor(db *sqlx.DB) *SQLExecutor {
+func NewSQLExecutor(db SQLXExecutor) *SQLExecutor {
 	return &SQLExecutor{
 		db:        db,
 		DebugFunc: func(sql string, args ...any) {},
@@ -53,8 +57,4 @@ func (r *SQLExecutor) Exec(ctx context.Context, query string, args ...any) (sql.
 	}
 
 	return res, nil
-}
-
-func (r *SQLExecutor) BeginTx(ctx context.Context, opts *sql.TxOptions) (*sql.Tx, error) {
-	return r.db.BeginTx(ctx, opts)
 }

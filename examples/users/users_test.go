@@ -247,6 +247,49 @@ func CaseCountByLastNameExistsCtxError(t *testing.T, params TestCaseParams) {
 	assert.ErrorContains(t, err, "unable to select records")
 }
 
+func CaseTxCommit(t *testing.T, params TestCaseParams) {
+	c, ctx := newTestCase(t, params)
+
+	tx, err := c.UnderTest.BeginTx(ctx, nil)
+	assert.NoError(t, err)
+
+	expected := &users.Object{
+		ID: "u99", FirstName: "Gordon",
+		LastName: ptr("Gibs"), BirthDate: newTime("1931-09-03"),
+	}
+
+	_, err = tx.Create(ctx, expected)
+	assert.NoError(t, err)
+
+	err = tx.Commit()
+	assert.NoError(t, err)
+
+	got, err := c.UnderTest.GetByID(ctx, expected.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, expected.ID, got.ID)
+}
+
+func CaseTxRollback(t *testing.T, params TestCaseParams) {
+	c, ctx := newTestCase(t, params)
+
+	tx, err := c.UnderTest.BeginTx(ctx, nil)
+	assert.NoError(t, err)
+
+	user := &users.Object{
+		ID: "u99", FirstName: "Gordon",
+		LastName: ptr("Gibs"), BirthDate: newTime("1931-09-03"),
+	}
+
+	_, err = tx.Create(ctx, user)
+	assert.NoError(t, err)
+
+	err = tx.Rollback()
+	assert.NoError(t, err)
+
+	_, err = c.UnderTest.GetByID(ctx, "u99")
+	assert.ErrorIs(t, err, sql.ErrNoRows)
+}
+
 func createDebugFunc(t *testing.T) api.DebugFunc {
 	return func(query string, args ...any) {
 		t.Logf("query: [%s]; args: %+v\n", query, args)

@@ -9,6 +9,7 @@ import (
 	"github.com/Klojer/sqlcredo/internal/page"
 	"github.com/Klojer/sqlcredo/internal/sqlexec"
 	"github.com/Klojer/sqlcredo/internal/table"
+	"github.com/Klojer/sqlcredo/internal/transaction"
 	"github.com/Klojer/sqlcredo/pkg/api"
 
 	"github.com/jmoiron/sqlx"
@@ -24,6 +25,7 @@ type SQLCredo[T any, I comparable] interface {
 	api.SQLExecutor
 	api.CRUD[T, I]
 	api.PageResolver[T]
+	api.TransactionExecutor[T, I]
 
 	// InitSchema executes a SQL query to initialize the database schema.
 	// Typically used for creating tables and other database objects.
@@ -43,6 +45,10 @@ type sqlCredo[T any, I comparable] struct {
 	*sqlexec.SQLExecutor
 	*crud.CRUD[T, I]
 	*page.PageResolver[T]
+
+	tableInfo table.Info
+	driver    string
+	dbx       *sqlx.DB
 }
 
 var _ SQLCredo[any, string] = &sqlCredo[any, string]{}
@@ -65,7 +71,14 @@ func NewSQLCredo[T any, I comparable](db *sql.DB, driver string, tableName strin
 		SQLExecutor:  executor,
 		CRUD:         crud.NewCRUD[T, I](tableInfo, executor, driver),
 		PageResolver: page.NewPageResolver[T](tableInfo, executor, driver),
+		tableInfo:    tableInfo,
+		driver:       driver,
+		dbx:          dbx,
 	}
+}
+
+func (r *sqlCredo[T, I]) BeginTx(ctx context.Context, opts *sql.TxOptions) (api.Transaction[T, I], error) {
+	return transaction.NewTx[T, I](ctx, r.dbx, r.tableInfo, r.driver, r.DebugFunc, opts)
 }
 
 // InitSchema executes a SQL query to initialize the database schema.

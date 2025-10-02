@@ -13,7 +13,7 @@ This file provides guidance to AI agent when working with code in this repositor
 - examples/ - examples of usage
 - internal/ - private contracts and implementations
 - pkg/ - public contracts
-- sqlcredo.go - entry point of the lib and aggregated conracts
+- sqlcredo.go - entry point of the lib and aggregated contracts
 - sqlcredo_test.go - tests
 - Makefile - tasks to build, run, test, etc
 - go.mod - dependencies file

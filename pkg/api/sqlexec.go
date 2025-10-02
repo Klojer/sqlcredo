@@ -22,8 +22,4 @@ type SQLExecutor interface {
 	// Exec executes a query that doesn't return rows (like INSERT, UPDATE, DELETE).
 	// Returns a Result object summarizing the effect of the query and any error encountered.
 	Exec(ctx context.Context, query string, args ...any) (sql.Result, error)
-
-	// BeginTx starts a new transaction with the given options.
-	// Returns the transaction object and any error encountered during transaction creation.
-	BeginTx(ctx context.Context, opts *sql.TxOptions) (*sql.Tx, error)
 }

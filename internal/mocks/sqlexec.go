@@ -3,7 +3,6 @@ package mocks
 import (
 	"context"
 	"database/sql"
-	"errors"
 
 	"github.com/Klojer/sqlcredo/pkg/api"
 
@@ -50,10 +49,6 @@ func (m *SQLExecutor) SelectMany(ctx context.Context, dest any, query string, ar
 		m.onSelectManyCb(ctx, dest, query, args...)
 	}
 	return mockArgs.Error(0)
-}
-
-func (m *SQLExecutor) BeginTx(ctx context.Context, opts *sql.TxOptions) (*sql.Tx, error) {
-	return nil, errors.New("not implemented")
 }
 
 func (m *SQLExecutor) SetOnExecCb(cb OnExecCb) {

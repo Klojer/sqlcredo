@@ -49,6 +49,8 @@ func TestPostgres(t *testing.T) {
 		{name: "count-users", run: CaseCountUsers},
 		{name: "count-by-last-name-exists", run: CaseCountByLastNameExists},
 		{name: "count-by-last-name-exists-ctx-err", run: CaseCountByLastNameExistsCtxError},
+		{name: "tx-commit", run: CaseTxCommit},
+		{name: "tx-rollback", run: CaseTxRollback},
 	}
 	for _, tC := range testCases {
 		t.Run(tC.name, func(t *testing.T) {

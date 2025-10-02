@@ -6,12 +6,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/Klojer/sqlcredo/internal/sqlexec"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -52,16 +52,6 @@ func TestSQLExecutor_Exec(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestSQLExecutor_BeginTx(t *testing.T) {
-	c, ctx := newTestCase(t)
-
-	c.Mock.ExpectBegin()
-
-	tx, err := c.UnderTest.BeginTx(ctx, nil)
-	assert.NoError(t, err)
-	assert.NotNil(t, tx)
-}
-
 func TestSQLExecutor_SelectOne_Error(t *testing.T) {
 	c, ctx := newTestCase(t)
 
@@ -97,18 +87,6 @@ func TestSQLExecutor_Exec_Error(t *testing.T) {
 	_, err := c.UnderTest.Exec(ctx, query, "John Doe")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "unable to exec db query")
-}
-
-func TestSQLExecutor_BeginTx_Error(t *testing.T) {
-	c, ctx := newTestCase(t)
-
-	c.Mock.ExpectBegin().
-		WillReturnError(fmt.Errorf("transaction error"))
-
-	tx, err := c.UnderTest.BeginTx(ctx, nil)
-	assert.Error(t, err)
-	assert.Nil(t, tx)
-	assert.Contains(t, err.Error(), "transaction error")
 }
 
 type testCaseData struct {
