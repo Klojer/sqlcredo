@@ -2,7 +2,7 @@ package transaction_test
 
 import (
 	"context"
-	"database/sql"
+	"errors"
 	"testing"
 	"time"
 
@@ -15,7 +15,16 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestTransactionCommit(t *testing.T) {
+func TestTransaction_BeginError(t *testing.T) {
+	c, ctx := newTestCase(t, func(mock sqlmock.Sqlmock) {
+		mock.ExpectBegin().WillReturnError(errors.New("tx issue"))
+	})
+
+	_, err := transaction.NewTx[testObj, string](ctx, c.DBX, c.TableInfo, c.Driver, c.DebugFunc, nil)
+	assert.ErrorContains(t, err, "unable to begin transaction:")
+}
+
+func TestTransaction_Commit(t *testing.T) {
 	c, ctx := newTestCase(t, func(mock sqlmock.Sqlmock) {
 		query := "INSERT INTO `test_table` \\(`id`, `name`\\) VALUES \\(\\?, \\?\\)"
 		mock.ExpectBegin()
@@ -24,16 +33,19 @@ func TestTransactionCommit(t *testing.T) {
 		mock.ExpectCommit()
 	})
 
-	_, err := c.UnderTest.Create(ctx, &testObj{
+	underTest, err := transaction.NewTx[testObj, string](ctx, c.DBX, c.TableInfo, c.Driver, c.DebugFunc, nil)
+	assert.NoError(t, err)
+
+	_, err = underTest.Create(ctx, &testObj{
 		ID: "#1", Name: "u1",
 	})
 	assert.NoError(t, err)
 
-	err = c.UnderTest.Commit()
+	err = underTest.Commit()
 	assert.NoError(t, err)
 }
 
-func TestTransactionRollback(t *testing.T) {
+func TestTransaction_Rollback(t *testing.T) {
 	c, ctx := newTestCase(t, func(mock sqlmock.Sqlmock) {
 		query := "INSERT INTO `test_table` \\(`id`, `name`\\) VALUES \\(\\?, \\?\\)"
 		mock.ExpectBegin()
@@ -42,12 +54,15 @@ func TestTransactionRollback(t *testing.T) {
 		mock.ExpectRollback()
 	})
 
-	_, err := c.UnderTest.Create(ctx, &testObj{
+	underTest, err := transaction.NewTx[testObj, string](ctx, c.DBX, c.TableInfo, c.Driver, c.DebugFunc, nil)
+	assert.NoError(t, err)
+
+	_, err = underTest.Create(ctx, &testObj{
 		ID: "#1", Name: "u1",
 	})
 	assert.NoError(t, err)
 
-	err = c.UnderTest.Rollback()
+	err = underTest.Rollback()
 	assert.NoError(t, err)
 }
 
@@ -55,8 +70,10 @@ type testCaseData struct {
 	ctx       context.Context
 	ctxCancel func()
 
-	DB        *sql.DB
-	UnderTest api.Transaction[testObj, string]
+	Driver    string
+	DBX       *sqlx.DB
+	TableInfo table.Info
+	DebugFunc api.DebugFunc
 }
 
 func newTestCase(t *testing.T, mockCfg func(sqlmock.Sqlmock)) (*testCaseData, context.Context) {
@@ -79,29 +96,24 @@ func newTestCase(t *testing.T, mockCfg func(sqlmock.Sqlmock)) (*testCaseData, co
 		t.Logf("Query: '%s'; args: '%v'", sql, args)
 	}
 
-	tx, err := transaction.NewTx[testObj, string](ctx, dbx, tableInfo, driver, debugFunc, nil)
-	assert.NoError(t, err)
-
 	c := &testCaseData{
 		ctx:       ctx,
 		ctxCancel: cancel,
 
-		DB:        db,
-		UnderTest: tx,
+		Driver:    driver,
+		DBX:       dbx,
+		TableInfo: tableInfo,
+		DebugFunc: debugFunc,
 	}
 
 	t.Cleanup(func() {
-		c.TearDown(t)
+		t.Helper()
+
+		_ = db.Close()
+		cancel()
 	})
 
 	return c, ctx
-}
-
-func (c *testCaseData) TearDown(t *testing.T) {
-	t.Helper()
-
-	_ = c.DB.Close()
-	c.ctxCancel()
 }
 
 type testObj struct {
