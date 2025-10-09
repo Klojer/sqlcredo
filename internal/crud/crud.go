@@ -37,49 +37,47 @@ func NewCRUD[T any, I comparable](table table.Info,
 	}
 }
 
-func (r *CRUD[T, I]) GetAll(ctx context.Context) ([]T, error) {
+func (r *CRUD[T, I]) GetAll(ctx context.Context, dest *[]T) error {
 	query, args, err := r.dialect.From(r.table.Name).Prepared(true).ToSQL()
 	if err != nil {
-		return nil, fmt.Errorf("unable to create 'select all' query: %w", err)
+		return fmt.Errorf("unable to create 'select all' query: %w", err)
 	}
-	return r.selectMany(ctx, query, args...)
+	return r.selectMany(ctx, dest, query, args...)
 }
 
-func (r *CRUD[T, I]) GetByID(ctx context.Context, id I) (T, error) {
-	var record T
-
+func (r *CRUD[T, I]) GetByID(ctx context.Context, dest *T, id I) error {
 	query, args, err := r.dialect.From(r.table.Name).
 		Where(goqu.I(r.table.IDColumn).Eq(id)).
 		Prepared(true).
 		ToSQL()
 	if err != nil {
-		return record, fmt.Errorf("unable to create 'select by id' query: %w", err)
+		return fmt.Errorf("unable to create 'select by id' query: %w", err)
 	}
 
-	err = r.executor.SelectOne(ctx, &record, query, args...)
+	err = r.executor.SelectOne(ctx, dest, query, args...)
 	if err != nil {
-		return record, fmt.Errorf("unable to select record: %w", err)
+		return fmt.Errorf("unable to select record: %w", err)
 	}
 
-	return record, nil
+	return nil
 }
 
-func (r *CRUD[T, I]) GetByIDs(ctx context.Context, ids []I) ([]T, error) {
+func (r *CRUD[T, I]) GetByIDs(ctx context.Context, dest *[]T, ids []I) error {
 	query, args, err := r.dialect.From(r.table.Name).
 		Where(goqu.I(r.table.IDColumn).In(ids)).
 		Order(goqu.I(r.table.IDColumn).Asc()).
 		Prepared(true).
 		ToSQL()
 	if err != nil {
-		return nil, fmt.Errorf("unable to create 'select by ids' query: %w", err)
+		return fmt.Errorf("unable to create 'select by ids' query: %w", err)
 	}
 
-	entities, err := r.selectMany(ctx, query, args...)
+	err = r.selectMany(ctx, dest, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("unable to select records: %w", err)
+		return fmt.Errorf("unable to select records: %w", err)
 	}
 
-	return entities, nil
+	return nil
 }
 
 func (r *CRUD[T, I]) Create(ctx context.Context, e *T) (sql.Result, error) {
@@ -123,12 +121,11 @@ func (r *CRUD[T, I]) Update(ctx context.Context, id I, e *T) (sql.Result, error)
 	return r.executor.Exec(ctx, query, args...)
 }
 
-func (r *CRUD[T, I]) selectMany(ctx context.Context, query string, args ...any) ([]T, error) {
-	var records []T
-	if err := r.executor.SelectMany(ctx, &records, query, args...); err != nil {
-		return nil, fmt.Errorf("unable to load records: %w", err)
+func (r *CRUD[T, I]) selectMany(ctx context.Context, dest *[]T, query string, args ...any) error {
+	if err := r.executor.SelectMany(ctx, dest, query, args...); err != nil {
+		return fmt.Errorf("unable to load records: %w", err)
 	}
-	return records, nil
+	return nil
 }
 
 func createTruncateQuery(driver string, table string) string {

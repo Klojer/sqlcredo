@@ -20,7 +20,8 @@ func TestCRUD_GetAll(t *testing.T) {
 	c.Executor.On("SelectMany", ctx, mock.Anything, "SELECT * FROM `test_table`", mock.Anything).
 		Return(nil)
 
-	_, err := c.UnderTest.GetAll(ctx)
+	got := make([]testObj, 0)
+	err := c.UnderTest.GetAll(ctx, &got)
 
 	assert.NoError(t, err)
 }
@@ -30,7 +31,8 @@ func TestCRUD_GetAll_DatabaseError(t *testing.T) {
 	c.Executor.On("SelectMany", ctx, mock.Anything, "SELECT * FROM `test_table`", mock.Anything).
 		Return(fmt.Errorf("database error"))
 
-	_, err := c.UnderTest.GetAll(ctx)
+	got := make([]testObj, 0)
+	err := c.UnderTest.GetAll(ctx, &got)
 
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "unable to load records")
@@ -42,7 +44,8 @@ func TestCRUD_GetByID(t *testing.T) {
 		"SELECT * FROM `test_table` WHERE (`id` = ?)", []any{"test_id"}).
 		Return(nil)
 
-	_, err := c.UnderTest.GetByID(ctx, "test_id")
+	var got testObj
+	err := c.UnderTest.GetByID(ctx, &got, "test_id")
 
 	assert.NoError(t, err)
 }
@@ -53,7 +56,8 @@ func TestCRUD_GetByID_DatabaseError(t *testing.T) {
 		"SELECT * FROM `test_table` WHERE (`id` = ?)", []any{"non_existent_id"}).
 		Return(fmt.Errorf("database error"))
 
-	_, err := c.UnderTest.GetByID(ctx, "non_existent_id")
+	var got testObj
+	err := c.UnderTest.GetByID(ctx, &got, "non_existent_id")
 
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "unable to select record")
@@ -66,7 +70,8 @@ func TestCRUD_GetByIDs(t *testing.T) {
 		[]any{"0", "3", "16"}).
 		Return(nil)
 
-	_, err := c.UnderTest.GetByIDs(ctx, []string{"0", "3", "16"})
+	got := make([]testObj, 0)
+	err := c.UnderTest.GetByIDs(ctx, &got, []string{"0", "3", "16"})
 
 	assert.NoError(t, err)
 }
@@ -78,10 +83,11 @@ func TestCRUD_GetByIDs_NoMatch(t *testing.T) {
 		[]any{"invalid_id_1", "invalid_id_2"}).
 		Return(nil)
 
-	result, err := c.UnderTest.GetByIDs(ctx, []string{"invalid_id_1", "invalid_id_2"})
+	got := make([]testObj, 0)
+	err := c.UnderTest.GetByIDs(ctx, &got, []string{"invalid_id_1", "invalid_id_2"})
 
 	assert.NoError(t, err)
-	assert.Empty(t, result)
+	assert.Empty(t, got)
 }
 
 func TestCRUD_GetByIDs_DatabaseError(t *testing.T) {
@@ -91,7 +97,8 @@ func TestCRUD_GetByIDs_DatabaseError(t *testing.T) {
 		[]any{"0", "3", "16"}).
 		Return(fmt.Errorf("select error"))
 
-	_, err := c.UnderTest.GetByIDs(ctx, []string{"0", "3", "16"})
+	got := make([]testObj, 0)
+	err := c.UnderTest.GetByIDs(ctx, &got, []string{"0", "3", "16"})
 
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "select error")

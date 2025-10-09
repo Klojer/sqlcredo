@@ -100,7 +100,8 @@ func CaseCreateUser(t *testing.T, params TestCaseParams) {
 	_, err := c.UnderTest.Create(ctx, expected)
 	assert.NoError(t, err)
 
-	got, err := c.UnderTest.GetByID(ctx, expected.ID)
+	var got users.Object
+	err = c.UnderTest.GetByID(ctx, &got, expected.ID)
 	assert.NoError(t, err)
 	assert.Equal(t, *expected, got)
 }
@@ -108,7 +109,8 @@ func CaseCreateUser(t *testing.T, params TestCaseParams) {
 func CaseGetAllUsers(t *testing.T, params TestCaseParams) {
 	c, ctx := newTestCase(t, params)
 
-	got, err := c.UnderTest.GetAll(ctx)
+	got := make([]users.Object, 0)
+	err := c.UnderTest.GetAll(ctx, &got)
 	assert.NoError(t, err)
 	assert.Equal(t, c.TestUsers, got)
 }
@@ -116,7 +118,8 @@ func CaseGetAllUsers(t *testing.T, params TestCaseParams) {
 func CaseGetUserByID(t *testing.T, params TestCaseParams) {
 	c, ctx := newTestCase(t, params)
 
-	got, err := c.UnderTest.GetByID(ctx, c.TestUsers[2].ID)
+	var got users.Object
+	err := c.UnderTest.GetByID(ctx, &got, c.TestUsers[2].ID)
 	assert.NoError(t, err)
 	assert.Equal(t, c.TestUsers[2], got)
 }
@@ -124,8 +127,9 @@ func CaseGetUserByID(t *testing.T, params TestCaseParams) {
 func CaseGetUsersByIDs(t *testing.T, params TestCaseParams) {
 	c, ctx := newTestCase(t, params)
 
+	got := make([]users.Object, 0)
 	ids := []users.Identity{c.TestUserPtrs[1].ID, c.TestUserPtrs[2].ID}
-	got, err := c.UnderTest.GetByIDs(ctx, ids)
+	err := c.UnderTest.GetByIDs(ctx, &got, ids)
 	assert.NoError(t, err)
 	assert.Equal(t, []users.Object{c.TestUsers[1], c.TestUsers[2]}, got)
 }
@@ -136,7 +140,8 @@ func CaseDeleteUser(t *testing.T, params TestCaseParams) {
 	_, err := c.UnderTest.Delete(ctx, c.TestUsers[1].ID)
 	assert.NoError(t, err)
 
-	_, err = c.UnderTest.GetByID(ctx, c.TestUsers[1].ID)
+	var got users.Object
+	err = c.UnderTest.GetByID(ctx, &got, c.TestUsers[1].ID)
 	assert.ErrorIs(t, err, sql.ErrNoRows)
 }
 
@@ -149,7 +154,8 @@ func CaseUpdateUser(t *testing.T, params TestCaseParams) {
 	_, err := c.UnderTest.Update(ctx, updated.ID, updated)
 	assert.NoError(t, err)
 
-	got, err := c.UnderTest.GetByID(ctx, c.TestUsers[1].ID)
+	var got users.Object
+	err = c.UnderTest.GetByID(ctx, &got, c.TestUsers[1].ID)
 	assert.NoError(t, err)
 	assert.Equal(t, *updated, got)
 }
@@ -157,14 +163,17 @@ func CaseUpdateUser(t *testing.T, params TestCaseParams) {
 func CaseValidatePageRequest(t *testing.T, params TestCaseParams) {
 	c, ctx := newTestCase(t, params)
 
-	_, err := c.UnderTest.GetPage(ctx, api.WithPageSize(0))
+	got := api.NewPage[users.Object]()
+	err := c.UnderTest.GetPage(ctx, &got, api.WithPageSize(0))
 	assert.ErrorIs(t, err, api.ErrInvalidPageSize)
 }
 
 func CaseGetPage(t *testing.T, params TestCaseParams) {
 	c, ctx := newTestCase(t, params)
+	buff := make([]users.Object, 0, 10)
 
-	gotPage1, err := c.UnderTest.GetPage(ctx,
+	gotPage1 := api.NewPage(&buff)
+	err := c.UnderTest.GetPage(ctx, &gotPage1,
 		api.WithPageNumber(0), api.WithPageSize(2))
 	assert.NoError(t, err)
 	assert.Equal(t, api.Page[users.Object]{
@@ -174,8 +183,10 @@ func CaseGetPage(t *testing.T, params TestCaseParams) {
 		TotalPages: 3,
 		Content:    c.TestUsers[0:2],
 	}, gotPage1)
+	buff = buff[:0]
 
-	gotPage2, err := c.UnderTest.GetPage(ctx,
+	gotPage2 := api.NewPage(&buff)
+	err = c.UnderTest.GetPage(ctx, &gotPage2,
 		api.WithPageNumber(1), api.WithPageSize(2))
 	assert.NoError(t, err)
 	assert.Equal(t, api.Page[users.Object]{
@@ -185,8 +196,10 @@ func CaseGetPage(t *testing.T, params TestCaseParams) {
 		TotalPages: 3,
 		Content:    c.TestUsers[2:4],
 	}, gotPage2)
+	buff = buff[:0]
 
-	gotPage3, err := c.UnderTest.GetPage(ctx,
+	gotPage3 := api.NewPage(&buff)
+	err = c.UnderTest.GetPage(ctx, &gotPage3,
 		api.WithPageNumber(2), api.WithPageSize(2))
 	assert.NoError(t, err)
 	assert.Equal(t, api.Page[users.Object]{
@@ -201,7 +214,8 @@ func CaseGetPage(t *testing.T, params TestCaseParams) {
 func CaseGetPageCustomOrder(t *testing.T, params TestCaseParams) {
 	c, ctx := newTestCase(t, params)
 
-	gotPage, err := c.UnderTest.GetPage(ctx,
+	gotPage := api.NewPage[users.Object]()
+	err := c.UnderTest.GetPage(ctx, &gotPage,
 		api.WithPageNumber(0),
 		api.WithPageSize(uint(len(c.TestUsers))),
 		api.WithSortBy("first_name"),
@@ -264,7 +278,8 @@ func CaseTxCommit(t *testing.T, params TestCaseParams) {
 	err = tx.Commit()
 	assert.NoError(t, err)
 
-	got, err := c.UnderTest.GetByID(ctx, expected.ID)
+	var got users.Object
+	err = c.UnderTest.GetByID(ctx, &got, expected.ID)
 	assert.NoError(t, err)
 	assert.Equal(t, expected.ID, got.ID)
 }
@@ -286,7 +301,8 @@ func CaseTxRollback(t *testing.T, params TestCaseParams) {
 	err = tx.Rollback()
 	assert.NoError(t, err)
 
-	_, err = c.UnderTest.GetByID(ctx, "u99")
+	var got users.Object
+	err = c.UnderTest.GetByID(ctx, &got, "u99")
 	assert.ErrorIs(t, err, sql.ErrNoRows)
 }
 

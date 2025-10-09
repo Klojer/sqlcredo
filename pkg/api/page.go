@@ -104,7 +104,7 @@ func WithSortDesc(column string) PageOpt {
 // PageResolver is an interface for retrieving paginated results of type T.
 type PageResolver[T any] interface {
 	// GetPage retrieves a single page of results based on the provided pagination options.
-	GetPage(ctx context.Context, opts ...PageOpt) (Page[T], error)
+	GetPage(ctx context.Context, dest *Page[T], opts ...PageOpt) error
 
 	// Count returns the total number of items available across all pages.
 	// This is useful for calculating total pages and displaying pagination metadata.
@@ -119,5 +119,23 @@ func NewEmptyPage[T any]() Page[T] {
 		Total:      0,
 		TotalPages: 0,
 		Content:    nil,
+	}
+}
+
+// NewPage creates a page to fill.
+func NewPage[T any](dest ...*[]T) Page[T] {
+	var content []T
+	if len(dest) > 0 {
+		content = *dest[0]
+	} else {
+		// TODO: what default size to use?
+		content = make([]T, 0)
+	}
+	return Page[T]{
+		Number:     0,
+		Size:       0,
+		Total:      0,
+		TotalPages: 0,
+		Content:    content,
 	}
 }

@@ -39,40 +39,39 @@ func NewPageResolver[T any](table table.Info,
 	}
 }
 
-func (r *PageResolver[T]) GetPage(ctx context.Context, opts ...api.PageOpt) (api.Page[T], error) {
+func (r *PageResolver[T]) GetPage(ctx context.Context, dest *api.Page[T], opts ...api.PageOpt) error {
 	req, err := api.NewPageParams(r.table.IDColumn, opts...)
 	if err != nil {
-		return r.emptyPage, fmt.Errorf("unable to create page params: %w", err)
+		return fmt.Errorf("unable to create page params: %w", err)
 	}
 
 	query, args, err := r.createPageQueryBuilder(req)
 	if err != nil {
-		return r.emptyPage, fmt.Errorf("unable to create page sql query: %w", err)
+		return fmt.Errorf("unable to create page sql query: %w", err)
 	}
 
-	pageRecords, err := r.selectMany(ctx, query, args...)
+	err = r.selectMany(ctx, &dest.Content, query, args...)
 	if err != nil {
-		return r.emptyPage, fmt.Errorf("unable to get page items: %w", err)
+		return fmt.Errorf("unable to get page items: %w", err)
 	}
 
 	totalRecords, err := r.Count(ctx)
 	if err != nil {
-		return r.emptyPage, fmt.Errorf("unable to count all items: %w", err)
+		return fmt.Errorf("unable to count all items: %w", err)
 	}
 
-	if len(pageRecords) == 0 {
-		return r.emptyPage, nil
+	if len(dest.Content) == 0 {
+		return nil
 	}
 
 	totalPages := uint(math.Ceil(float64(totalRecords) / float64(req.PageSize)))
 
-	return api.Page[T]{
-		Number:     req.PageNumber,
-		Size:       uint(len(pageRecords)),
-		Total:      totalRecords,
-		TotalPages: totalPages,
-		Content:    pageRecords,
-	}, nil
+	dest.Number = req.PageNumber
+	dest.Size = uint(len(dest.Content))
+	dest.Total = totalRecords
+	dest.TotalPages = totalPages
+
+	return nil
 }
 
 func (r *PageResolver[T]) createPageQueryBuilder(params api.PageParams) (string, []any, error) {
@@ -103,10 +102,9 @@ func (r *PageResolver[T]) Count(ctx context.Context) (uint64, error) {
 	return res, nil
 }
 
-func (r *PageResolver[T]) selectMany(ctx context.Context, query string, args ...any) ([]T, error) {
-	var records []T
-	if err := r.executor.SelectMany(ctx, &records, query, args...); err != nil {
-		return nil, fmt.Errorf("unable to load page records: %w", err)
+func (r *PageResolver[T]) selectMany(ctx context.Context, dest *[]T, query string, args ...any) error {
+	if err := r.executor.SelectMany(ctx, dest, query, args...); err != nil {
+		return fmt.Errorf("unable to load page records: %w", err)
 	}
-	return records, nil
+	return nil
 }

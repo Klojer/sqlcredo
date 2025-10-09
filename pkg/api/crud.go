@@ -11,15 +11,15 @@ import (
 //   - I: the type of the entity's ID field (must be comparable)
 type CRUD[T any, I comparable] interface {
 	// GetAll retrieves all entities of type T from the database.
-	GetAll(ctx context.Context) ([]T, error)
+	GetAll(ctx context.Context, dest *[]T) error
 
 	// GetByID retrieves a single entity by its ID.
-	// Returns the zero value of T and an error if the entity is not found.
-	GetByID(ctx context.Context, id I) (T, error)
+	// Returns an error if the entity is not found.
+	GetByID(ctx context.Context, dest *T, id I) error
 
 	// GetByIDs retrieves multiple entities by their IDs.
 	// The returned slice maintains the same order as the input IDs.
-	GetByIDs(ctx context.Context, ids []I) ([]T, error)
+	GetByIDs(ctx context.Context, dest *[]T, ids []I) error
 
 	// Create inserts a new entity into the database.
 	// The entity pointer must not be nil.

@@ -62,7 +62,7 @@ func TestPageResolver_GetPage(t *testing.T) {
 					Return(nil)
 				c.Executor.SetOnSelectOneCb(replaceDestWithUint64(t, 0))
 			},
-			want: api.Page[testObj]{},
+			want: api.NewPage[testObj](),
 		},
 		{
 			desc: "reverse sort order",
@@ -77,7 +77,7 @@ func TestPageResolver_GetPage(t *testing.T) {
 					Return(nil)
 				c.Executor.SetOnSelectOneCb(replaceDestWithUint64(t, 0))
 			},
-			want: api.Page[testObj]{},
+			want: api.NewPage[testObj](),
 		},
 		{
 			desc:          "invalid opts",
@@ -114,11 +114,13 @@ func TestPageResolver_GetPage(t *testing.T) {
 			c, ctx := newTestCase(t)
 			tC.configureMock(ctx, c)
 
-			got, gotErr := c.UnderTest.GetPage(ctx, tC.opts...)
+			content := make([]testObj, 0)
+			got := api.NewPage(&content)
+			gotErr := c.UnderTest.GetPage(ctx, &got, tC.opts...)
 
 			if tC.wantErr != "" {
 				assert.ErrorContains(t, gotErr, tC.wantErr)
-				assert.Equal(t, api.NewEmptyPage[testObj](), got)
+				assert.Equal(t, api.NewPage[testObj](), got)
 			} else {
 				assert.NoError(t, gotErr)
 				assert.Equal(t, tC.want, got)
