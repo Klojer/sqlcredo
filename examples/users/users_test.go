@@ -18,7 +18,7 @@ import (
 
 type TestCaseDesc struct {
 	name string
-	run  func(*testing.T, TestCaseParams)
+	run  func(*testing.T, context.Context, *TestCaseData)
 }
 
 type TestCaseParams struct {
@@ -39,18 +39,18 @@ func createTestUsers() ([]users.Object, []*users.Object) {
 	return values, ptrs
 }
 
-type testCaseData struct {
-	ctx       context.Context
-	ctxCancel func()
+type TestCaseData struct {
+	Ctx       context.Context
+	CtxCancel func()
 
 	TestUsers    []users.Object
 	TestUserPtrs []*users.Object
 
-	db        *sql.DB
+	DB        *sql.DB
 	UnderTest *users.Repo
 }
 
-func newTestCase(t *testing.T, params TestCaseParams) (*testCaseData, context.Context) {
+func NewTestCase(t *testing.T, params TestCaseParams) (*TestCaseData, context.Context) {
 	ctx, ctxCancel := context.WithTimeout(context.Background(), 30*time.Second)
 	testUserValues, testUserPtrs := createTestUsers()
 
@@ -68,31 +68,19 @@ func newTestCase(t *testing.T, params TestCaseParams) (*testCaseData, context.Co
 	require.NoError(t, err)
 	require.Equal(t, len(testUserPtrs), int(cnt))
 
-	c := &testCaseData{
-		ctx:          ctx,
-		ctxCancel:    ctxCancel,
+	c := &TestCaseData{
+		Ctx:          ctx,
+		CtxCancel:    ctxCancel,
 		TestUsers:    testUserValues,
 		TestUserPtrs: testUserPtrs,
-		db:           params.DB,
+		DB:           params.DB,
 		UnderTest:    repo,
 	}
-
-	t.Cleanup(func() {
-		c.TearDown(t)
-	})
 
 	return c, ctx
 }
 
-func (c *testCaseData) TearDown(t *testing.T) {
-	_, err := c.UnderTest.DeleteAll(c.ctx)
-	require.NoError(t, err)
-	c.ctxCancel()
-}
-
-func CaseCreateUser(t *testing.T, params TestCaseParams) {
-	c, ctx := newTestCase(t, params)
-
+func CaseCreateUser(t *testing.T, ctx context.Context, c *TestCaseData) {
 	expected := &users.Object{
 		ID: "u99", FirstName: "Gordon",
 		LastName: ptr("Gibs"), BirthDate: newTime("1931-09-03"),
@@ -106,27 +94,21 @@ func CaseCreateUser(t *testing.T, params TestCaseParams) {
 	assert.Equal(t, *expected, got)
 }
 
-func CaseGetAllUsers(t *testing.T, params TestCaseParams) {
-	c, ctx := newTestCase(t, params)
-
+func CaseGetAllUsers(t *testing.T, ctx context.Context, c *TestCaseData) {
 	got := make([]users.Object, 0)
 	err := c.UnderTest.GetAll(ctx, &got)
 	assert.NoError(t, err)
 	assert.Equal(t, c.TestUsers, got)
 }
 
-func CaseGetUserByID(t *testing.T, params TestCaseParams) {
-	c, ctx := newTestCase(t, params)
-
+func CaseGetUserByID(t *testing.T, ctx context.Context, c *TestCaseData) {
 	var got users.Object
 	err := c.UnderTest.GetByID(ctx, &got, c.TestUsers[2].ID)
 	assert.NoError(t, err)
 	assert.Equal(t, c.TestUsers[2], got)
 }
 
-func CaseGetUsersByIDs(t *testing.T, params TestCaseParams) {
-	c, ctx := newTestCase(t, params)
-
+func CaseGetUsersByIDs(t *testing.T, ctx context.Context, c *TestCaseData) {
 	got := make([]users.Object, 0)
 	ids := []users.Identity{c.TestUserPtrs[1].ID, c.TestUserPtrs[2].ID}
 	err := c.UnderTest.GetByIDs(ctx, &got, ids)
@@ -134,9 +116,7 @@ func CaseGetUsersByIDs(t *testing.T, params TestCaseParams) {
 	assert.Equal(t, []users.Object{c.TestUsers[1], c.TestUsers[2]}, got)
 }
 
-func CaseDeleteUser(t *testing.T, params TestCaseParams) {
-	c, ctx := newTestCase(t, params)
-
+func CaseDeleteUser(t *testing.T, ctx context.Context, c *TestCaseData) {
 	_, err := c.UnderTest.Delete(ctx, c.TestUsers[1].ID)
 	assert.NoError(t, err)
 
@@ -145,9 +125,7 @@ func CaseDeleteUser(t *testing.T, params TestCaseParams) {
 	assert.ErrorIs(t, err, sql.ErrNoRows)
 }
 
-func CaseUpdateUser(t *testing.T, params TestCaseParams) {
-	c, ctx := newTestCase(t, params)
-
+func CaseUpdateUser(t *testing.T, ctx context.Context, c *TestCaseData) {
 	updated := c.TestUserPtrs[1]
 	updated.FirstName = updated.FirstName + "_updated"
 
@@ -160,16 +138,13 @@ func CaseUpdateUser(t *testing.T, params TestCaseParams) {
 	assert.Equal(t, *updated, got)
 }
 
-func CaseValidatePageRequest(t *testing.T, params TestCaseParams) {
-	c, ctx := newTestCase(t, params)
-
+func CaseValidatePageRequest(t *testing.T, ctx context.Context, c *TestCaseData) {
 	got := api.NewPage[users.Object]()
 	err := c.UnderTest.GetPage(ctx, &got, api.WithPageSize(0))
 	assert.ErrorIs(t, err, api.ErrInvalidPageSize)
 }
 
-func CaseGetPage(t *testing.T, params TestCaseParams) {
-	c, ctx := newTestCase(t, params)
+func CaseGetPage(t *testing.T, ctx context.Context, c *TestCaseData) {
 	buff := make([]users.Object, 0, 10)
 
 	gotPage1 := api.NewPage(&buff)
@@ -211,9 +186,7 @@ func CaseGetPage(t *testing.T, params TestCaseParams) {
 	}, gotPage3)
 }
 
-func CaseGetPageCustomOrder(t *testing.T, params TestCaseParams) {
-	c, ctx := newTestCase(t, params)
-
+func CaseGetPageCustomOrder(t *testing.T, ctx context.Context, c *TestCaseData) {
 	gotPage := api.NewPage[users.Object]()
 	err := c.UnderTest.GetPage(ctx, &gotPage,
 		api.WithPageNumber(0),
@@ -232,17 +205,13 @@ John Smith
 		usersToString(gotPage.Content...))
 }
 
-func CaseCountUsers(t *testing.T, params TestCaseParams) {
-	c, ctx := newTestCase(t, params)
-
+func CaseCountUsers(t *testing.T, ctx context.Context, c *TestCaseData) {
 	got, err := c.UnderTest.Count(ctx)
 	assert.NoError(t, err)
 	assert.Equal(t, len(c.TestUserPtrs), int(got))
 }
 
-func CaseCountByLastNameExists(t *testing.T, params TestCaseParams) {
-	c, ctx := newTestCase(t, params)
-
+func CaseCountByLastNameExists(t *testing.T, ctx context.Context, c *TestCaseData) {
 	got, err := c.UnderTest.CountByLastNameExists(ctx)
 	assert.NoError(t, err)
 	assert.Equal(t, map[string]int{
@@ -251,8 +220,7 @@ func CaseCountByLastNameExists(t *testing.T, params TestCaseParams) {
 	}, got)
 }
 
-func CaseCountByLastNameExistsCtxError(t *testing.T, params TestCaseParams) {
-	c, ctx := newTestCase(t, params)
+func CaseCountByLastNameExistsCtxError(t *testing.T, ctx context.Context, c *TestCaseData) {
 	newCtx, cancel := context.WithCancel(ctx)
 	cancel()
 
@@ -261,9 +229,7 @@ func CaseCountByLastNameExistsCtxError(t *testing.T, params TestCaseParams) {
 	assert.ErrorContains(t, err, "unable to select records")
 }
 
-func CaseTxCommit(t *testing.T, params TestCaseParams) {
-	c, ctx := newTestCase(t, params)
-
+func CaseTxCommit(t *testing.T, ctx context.Context, c *TestCaseData) {
 	tx, err := c.UnderTest.BeginTx(ctx, nil)
 	assert.NoError(t, err)
 
@@ -284,9 +250,7 @@ func CaseTxCommit(t *testing.T, params TestCaseParams) {
 	assert.Equal(t, expected.ID, got.ID)
 }
 
-func CaseTxRollback(t *testing.T, params TestCaseParams) {
-	c, ctx := newTestCase(t, params)
-
+func CaseTxRollback(t *testing.T, ctx context.Context, c *TestCaseData) {
 	tx, err := c.UnderTest.BeginTx(ctx, nil)
 	assert.NoError(t, err)
 
@@ -308,6 +272,7 @@ func CaseTxRollback(t *testing.T, params TestCaseParams) {
 
 func createDebugFunc(t *testing.T) api.DebugFunc {
 	return func(query string, args ...any) {
+		t.Helper()
 		t.Logf("query: [%s]; args: %+v\n", query, args)
 	}
 }

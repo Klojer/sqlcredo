@@ -27,12 +27,6 @@ func TestSqlite(t *testing.T) {
 	require.NoError(t, err)
 	defer func() { require.NoError(t, db.Close()) }()
 
-	params := TestCaseParams{
-		Schema: sqliteSchema,
-		Driver: sqliteDriver,
-		DB:     db,
-	}
-
 	testCases := []TestCaseDesc{
 		{name: "create-user", run: CaseCreateUser},
 		{name: "get-all-users", run: CaseGetAllUsers},
@@ -50,8 +44,18 @@ func TestSqlite(t *testing.T) {
 		{name: "tx-rollback", run: CaseTxRollback},
 	}
 	for _, tC := range testCases {
-		t.Run(tC.name, func(t *testing.T) {
-			tC.run(t, params)
+		caze, ctx := NewTestCase(t, TestCaseParams{
+			Schema: sqliteSchema,
+			Driver: sqliteDriver,
+			DB:     db,
 		})
+
+		t.Run(tC.name, func(t *testing.T) {
+			tC.run(t, ctx, caze)
+		})
+
+		_, err = caze.UnderTest.DeleteAll(ctx)
+		require.NoError(t, err)
+		caze.CtxCancel()
 	}
 }

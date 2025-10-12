@@ -30,12 +30,6 @@ func TestPostgres(t *testing.T) {
 	db := createDB(t)
 	defer func() { require.NoError(t, db.Close()) }()
 
-	params := TestCaseParams{
-		Schema: pgSchema,
-		Driver: pgDriver,
-		DB:     db,
-	}
-
 	testCases := []TestCaseDesc{
 		{name: "create-user", run: CaseCreateUser},
 		{name: "get-all-users", run: CaseGetAllUsers},
@@ -54,7 +48,17 @@ func TestPostgres(t *testing.T) {
 	}
 	for _, tC := range testCases {
 		t.Run(tC.name, func(t *testing.T) {
-			tC.run(t, params)
+			caze, ctx := NewTestCase(t, TestCaseParams{
+				Schema: pgSchema,
+				Driver: pgDriver,
+				DB:     db,
+			})
+
+			tC.run(t, ctx, caze)
+
+			_, err := caze.UnderTest.DeleteAll(ctx)
+			require.NoError(t, err)
+			caze.CtxCancel()
 		})
 	}
 }
