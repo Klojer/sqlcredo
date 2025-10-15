@@ -115,7 +115,7 @@ func TestPageResolver_GetPage(t *testing.T) {
 			tC.configureMock(ctx, c)
 
 			content := make([]testObj, 0)
-			got := api.NewPage(&content)
+			got := api.NewPage(api.WithNewPageContent(&content))
 			gotErr := c.UnderTest.GetPage(ctx, &got, tC.opts...)
 
 			if tC.wantErr != "" {

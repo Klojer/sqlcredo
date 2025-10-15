@@ -40,7 +40,7 @@ func NewPageResolver[T any](table table.Info,
 }
 
 func (r *PageResolver[T]) GetPage(ctx context.Context, dest *api.Page[T], opts ...api.PageOpt) error {
-	req, err := api.NewPageParams(r.table.IDColumn, opts...)
+	req, err := api.NewPageOpts(r.table.IDColumn, opts...)
 	if err != nil {
 		return fmt.Errorf("unable to create page params: %w", err)
 	}
@@ -74,7 +74,7 @@ func (r *PageResolver[T]) GetPage(ctx context.Context, dest *api.Page[T], opts .
 	return nil
 }
 
-func (r *PageResolver[T]) createPageQueryBuilder(params api.PageParams) (string, []any, error) {
+func (r *PageResolver[T]) createPageQueryBuilder(params api.PageOpts) (string, []any, error) {
 	builder := r.dialect.From(r.table.Name).Prepared(true)
 	builder = builder.Offset(params.PageNumber * params.PageSize)
 	builder = builder.Limit(params.PageSize)
@@ -82,7 +82,7 @@ func (r *PageResolver[T]) createPageQueryBuilder(params api.PageParams) (string,
 	return builder.ToSQL()
 }
 
-func buildOrderExprs(params api.PageParams) []exp.OrderedExpression {
+func buildOrderExprs(params api.PageOpts) []exp.OrderedExpression {
 	orderExprs := make([]exp.OrderedExpression, 0, len(params.SortBy))
 	for _, s := range params.SortBy {
 		if params.SortDesc {

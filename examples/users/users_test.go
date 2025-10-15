@@ -147,7 +147,7 @@ func CaseValidatePageRequest(t *testing.T, ctx context.Context, c *TestCaseData)
 func CaseGetPage(t *testing.T, ctx context.Context, c *TestCaseData) {
 	buff := make([]users.Object, 0, 10)
 
-	gotPage1 := api.NewPage(&buff)
+	gotPage1 := api.NewPage(api.WithNewPageContent(&buff))
 	err := c.UnderTest.GetPage(ctx, &gotPage1,
 		api.WithPageNumber(0), api.WithPageSize(2))
 	assert.NoError(t, err)
@@ -160,7 +160,7 @@ func CaseGetPage(t *testing.T, ctx context.Context, c *TestCaseData) {
 	}, gotPage1)
 	buff = buff[:0]
 
-	gotPage2 := api.NewPage(&buff)
+	gotPage2 := api.NewPage(api.WithNewPageContent(&buff))
 	err = c.UnderTest.GetPage(ctx, &gotPage2,
 		api.WithPageNumber(1), api.WithPageSize(2))
 	assert.NoError(t, err)
@@ -173,7 +173,7 @@ func CaseGetPage(t *testing.T, ctx context.Context, c *TestCaseData) {
 	}, gotPage2)
 	buff = buff[:0]
 
-	gotPage3 := api.NewPage(&buff)
+	gotPage3 := api.NewPage(api.WithNewPageContent(&buff))
 	err = c.UnderTest.GetPage(ctx, &gotPage3,
 		api.WithPageNumber(2), api.WithPageSize(2))
 	assert.NoError(t, err)

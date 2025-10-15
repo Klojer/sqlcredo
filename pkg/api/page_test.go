@@ -20,7 +20,7 @@ func TestPageParams_Validate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			params := api.PageParams{PageSize: tt.pageSize}
+			params := api.PageOpts{PageSize: tt.pageSize}
 			err := params.Validate()
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -35,13 +35,13 @@ func TestNewPageParams(t *testing.T) {
 	testCases := []struct {
 		desc    string
 		opts    []api.PageOpt
-		want    api.PageParams
+		want    api.PageOpts
 		wantErr bool
 	}{
 		{
 			desc: "no options",
 			opts: nil,
-			want: api.PageParams{
+			want: api.PageOpts{
 				PageNumber: api.DefaultPageNumber,
 				PageSize:   api.DefaultPageSize,
 				SortBy:     []string{"testId"},
@@ -51,17 +51,17 @@ func TestNewPageParams(t *testing.T) {
 		{
 			desc:    "invalid opts",
 			opts:    []api.PageOpt{api.WithPageSize(0)},
-			want:    api.PageParams{},
+			want:    api.PageOpts{},
 			wantErr: true,
 		},
 	}
 	for _, tC := range testCases {
 		t.Run(tC.desc, func(t *testing.T) {
-			got, gotErr := api.NewPageParams("testId", tC.opts...)
+			got, gotErr := api.NewPageOpts("testId", tC.opts...)
 
 			if tC.wantErr {
 				assert.Error(t, gotErr)
-				assert.Equal(t, api.PageParams{}, got)
+				assert.Equal(t, api.PageOpts{}, got)
 			} else {
 				assert.NoError(t, gotErr)
 				assert.Equal(t, tC.want, got)
@@ -71,7 +71,7 @@ func TestNewPageParams(t *testing.T) {
 }
 
 func TestWithPageNumber(t *testing.T) {
-	params := &api.PageParams{}
+	params := &api.PageOpts{}
 	pageNumber := uint(2)
 
 	api.WithPageNumber(pageNumber)(params)
@@ -80,7 +80,7 @@ func TestWithPageNumber(t *testing.T) {
 }
 
 func TestWithPageSize(t *testing.T) {
-	params := &api.PageParams{}
+	params := &api.PageOpts{}
 	pageSize := uint(5)
 
 	api.WithPageSize(pageSize)(params)
@@ -89,7 +89,7 @@ func TestWithPageSize(t *testing.T) {
 }
 
 func TestWithSortBy(t *testing.T) {
-	params := &api.PageParams{}
+	params := &api.PageOpts{}
 	column := "name"
 
 	api.WithSortBy(column)(params)
@@ -98,7 +98,7 @@ func TestWithSortBy(t *testing.T) {
 }
 
 func TestWithSortDesc(t *testing.T) {
-	params := &api.PageParams{}
+	params := &api.PageOpts{}
 
 	api.WithSortDesc("name")(params)
 
