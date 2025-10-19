@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/Klojer/sqlcredo/internal/crud"
+	"github.com/Klojer/sqlcredo/internal/domain"
 	"github.com/Klojer/sqlcredo/internal/mocks"
 	"github.com/Klojer/sqlcredo/internal/table"
-	"github.com/Klojer/sqlcredo/pkg/api"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -232,7 +232,7 @@ type testCaseData struct {
 	ctxCancel func()
 
 	Executor  *mocks.SQLExecutor
-	UnderTest api.CRUD[testObj, string]
+	UnderTest domain.CRUD[testObj, string]
 }
 
 func newTestCase(t *testing.T) (*testCaseData, context.Context) {

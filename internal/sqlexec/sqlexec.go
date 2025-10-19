@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 
-	"github.com/Klojer/sqlcredo/pkg/api"
+	"github.com/Klojer/sqlcredo/internal/domain"
 )
 
 type SQLXExecutor interface {
@@ -16,10 +16,10 @@ type SQLXExecutor interface {
 
 type SQLExecutor struct {
 	db        SQLXExecutor
-	DebugFunc api.DebugFunc
+	DebugFunc domain.DebugFunc
 }
 
-var _ api.SQLExecutor = &SQLExecutor{}
+var _ domain.SQLExecutor = &SQLExecutor{}
 
 func NewSQLExecutor(db SQLXExecutor) *SQLExecutor {
 	return &SQLExecutor{

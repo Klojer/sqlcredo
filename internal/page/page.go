@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/Klojer/sqlcredo/internal/domain"
 	"github.com/Klojer/sqlcredo/internal/goquext"
 	"github.com/Klojer/sqlcredo/internal/table"
-	"github.com/Klojer/sqlcredo/pkg/api"
 
 	"github.com/doug-martin/goqu/v9"
 	"github.com/doug-martin/goqu/v9/exp"
@@ -19,28 +19,28 @@ const (
 
 type PageResolver[T any] struct {
 	table      table.Info
-	executor   api.SQLExecutor
+	executor   domain.SQLExecutor
 	countQuery string
-	emptyPage  api.Page[T]
+	emptyPage  domain.Page[T]
 	dialect    goqu.DialectWrapper
 }
 
-var _ api.PageResolver[any] = &PageResolver[any]{}
+var _ domain.PageResolver[any] = &PageResolver[any]{}
 
 func NewPageResolver[T any](table table.Info,
-	executor api.SQLExecutor, driver string,
+	executor domain.SQLExecutor, driver string,
 ) *PageResolver[T] {
 	return &PageResolver[T]{
 		table:      table,
 		executor:   executor,
 		countQuery: fmt.Sprintf(countQueryTemplate, table.IDColumn, table.Name),
-		emptyPage:  api.NewEmptyPage[T](),
+		emptyPage:  domain.Page[T]{},
 		dialect:    goqu.Dialect(goquext.CreateDialectString(driver)),
 	}
 }
 
-func (r *PageResolver[T]) GetPage(ctx context.Context, dest *api.Page[T], opts ...api.PageOpt) error {
-	req, err := api.NewPageOpts(r.table.IDColumn, opts...)
+func (r *PageResolver[T]) GetPage(ctx context.Context, dest *domain.Page[T], opts ...domain.PageOpt) error {
+	req, err := domain.NewPageOpts(r.table.IDColumn, opts...)
 	if err != nil {
 		return fmt.Errorf("unable to create page params: %w", err)
 	}
@@ -74,7 +74,7 @@ func (r *PageResolver[T]) GetPage(ctx context.Context, dest *api.Page[T], opts .
 	return nil
 }
 
-func (r *PageResolver[T]) createPageQueryBuilder(params api.PageOpts) (string, []any, error) {
+func (r *PageResolver[T]) createPageQueryBuilder(params domain.PageOpts) (string, []any, error) {
 	builder := r.dialect.From(r.table.Name).Prepared(true)
 	builder = builder.Offset(params.PageNumber * params.PageSize)
 	builder = builder.Limit(params.PageSize)
@@ -82,7 +82,7 @@ func (r *PageResolver[T]) createPageQueryBuilder(params api.PageOpts) (string, [
 	return builder.ToSQL()
 }
 
-func buildOrderExprs(params api.PageOpts) []exp.OrderedExpression {
+func buildOrderExprs(params domain.PageOpts) []exp.OrderedExpression {
 	orderExprs := make([]exp.OrderedExpression, 0, len(params.SortBy))
 	for _, s := range params.SortBy {
 		if params.SortDesc {

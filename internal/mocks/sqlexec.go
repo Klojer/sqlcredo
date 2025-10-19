@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/Klojer/sqlcredo/pkg/api"
+	"github.com/Klojer/sqlcredo/internal/domain"
 
 	"github.com/stretchr/testify/mock"
 )
@@ -21,7 +21,7 @@ type SQLExecutor struct {
 	onSelectManyCb OnSelectCb
 }
 
-var _ api.SQLExecutor = &SQLExecutor{}
+var _ domain.SQLExecutor = &SQLExecutor{}
 
 func NewSQLExecutor() *SQLExecutor {
 	return &SQLExecutor{}

@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
+	sc "github.com/Klojer/sqlcredo"
 	"github.com/Klojer/sqlcredo/internal/table"
 	"github.com/Klojer/sqlcredo/internal/transaction"
-	"github.com/Klojer/sqlcredo/pkg/api"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/jmoiron/sqlx"
@@ -73,7 +73,7 @@ type testCaseData struct {
 	Driver    string
 	DBX       *sqlx.DB
 	TableInfo table.Info
-	DebugFunc api.DebugFunc
+	DebugFunc sc.DebugFunc
 }
 
 func newTestCase(t *testing.T, mockCfg func(sqlmock.Sqlmock)) (*testCaseData, context.Context) {

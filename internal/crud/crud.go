@@ -5,9 +5,9 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/Klojer/sqlcredo/internal/domain"
 	"github.com/Klojer/sqlcredo/internal/goquext"
 	"github.com/Klojer/sqlcredo/internal/table"
-	"github.com/Klojer/sqlcredo/pkg/api"
 
 	"github.com/doug-martin/goqu/v9"
 )
@@ -19,15 +19,15 @@ const (
 
 type CRUD[T any, I comparable] struct {
 	table         table.Info
-	executor      api.SQLExecutor
+	executor      domain.SQLExecutor
 	truncateQuery string
 	dialect       goqu.DialectWrapper
 }
 
-var _ api.CRUD[any, string] = &CRUD[any, string]{}
+var _ domain.CRUD[any, string] = &CRUD[any, string]{}
 
 func NewCRUD[T any, I comparable](table table.Info,
-	executor api.SQLExecutor, driver string,
+	executor domain.SQLExecutor, driver string,
 ) *CRUD[T, I] {
 	return &CRUD[T, I]{
 		table:         table,

@@ -6,27 +6,27 @@ import (
 	"fmt"
 
 	"github.com/Klojer/sqlcredo/internal/crud"
+	"github.com/Klojer/sqlcredo/internal/domain"
 	"github.com/Klojer/sqlcredo/internal/page"
 	"github.com/Klojer/sqlcredo/internal/sqlexec"
 	"github.com/Klojer/sqlcredo/internal/table"
-	"github.com/Klojer/sqlcredo/pkg/api"
 
 	"github.com/jmoiron/sqlx"
 )
 
 type Wrapper[T any, I comparable] struct {
 	tx        *sqlx.Tx
-	debugFunc api.DebugFunc
+	debugFunc domain.DebugFunc
 
-	api.SQLExecutor
-	api.CRUD[T, I]
-	api.PageResolver[T]
+	domain.SQLExecutor
+	domain.CRUD[T, I]
+	domain.PageResolver[T]
 }
 
-var _ api.Transaction[any, string] = &Wrapper[any, string]{}
+var _ domain.Transaction[any, string] = &Wrapper[any, string]{}
 
 func NewTx[T any, I comparable](ctx context.Context,
-	db *sqlx.DB, tableInfo table.Info, driver string, debugFunc api.DebugFunc, opts *sql.TxOptions,
+	db *sqlx.DB, tableInfo table.Info, driver string, debugFunc domain.DebugFunc, opts *sql.TxOptions,
 ) (*Wrapper[T, I], error) {
 	tx, err := db.BeginTxx(ctx, opts)
 	if err != nil {

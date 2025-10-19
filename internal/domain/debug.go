@@ -1,4 +1,4 @@
-package api
+package domain
 
 type (
 	// DebugFunc is a function type used for SQL query debugging and logging.

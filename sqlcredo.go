@@ -10,7 +10,6 @@ import (
 	"github.com/Klojer/sqlcredo/internal/sqlexec"
 	"github.com/Klojer/sqlcredo/internal/table"
 	"github.com/Klojer/sqlcredo/internal/transaction"
-	"github.com/Klojer/sqlcredo/pkg/api"
 
 	"github.com/jmoiron/sqlx"
 )
@@ -22,10 +21,10 @@ import (
 //   - T: The entity type being managed (can be any type)
 //   - I: The type of the entity's ID field (must be comparable)
 type SQLCredo[T any, I comparable] interface {
-	api.SQLExecutor
-	api.CRUD[T, I]
-	api.PageResolver[T]
-	api.TransactionExecutor[T, I]
+	SQLExecutor
+	CRUD[T, I]
+	PageResolver[T]
+	TransactionExecutor[T, I]
 
 	// InitSchema executes a SQL query to initialize the database schema.
 	// Typically used for creating tables and other database objects.
@@ -34,11 +33,11 @@ type SQLCredo[T any, I comparable] interface {
 	// WithDebugFunc sets a debug function for SQL query logging.
 	// The debug function will be called before executing any SQL query.
 	// Returns the modified SQLCredo instance for method chaining.
-	WithDebugFunc(newDebugFunc api.DebugFunc) SQLCredo[T, I]
+	WithDebugFunc(newDebugFunc DebugFunc) SQLCredo[T, I]
 
 	// GetDebugFunc returns the currently set debug function.
 	// Returns nil if no debug function is set.
-	GetDebugFunc() api.DebugFunc
+	GetDebugFunc() DebugFunc
 }
 
 type sqlCredo[T any, I comparable] struct {
@@ -77,7 +76,7 @@ func NewSQLCredo[T any, I comparable](db *sql.DB, driver string, tableName strin
 	}
 }
 
-func (r *sqlCredo[T, I]) BeginTx(ctx context.Context, opts *sql.TxOptions) (api.Transaction[T, I], error) {
+func (r *sqlCredo[T, I]) BeginTx(ctx context.Context, opts *sql.TxOptions) (Transaction[T, I], error) {
 	return transaction.NewTx[T, I](ctx, r.dbx, r.tableInfo, r.driver, r.DebugFunc, opts)
 }
 
@@ -95,13 +94,13 @@ func (r *sqlCredo[T, I]) InitSchema(ctx context.Context, sql string) (sql.Result
 // WithDebugFunc sets a new debug function for SQL query logging.
 // The debug function will be called before executing any SQL query,
 // allowing for query inspection and logging.
-func (r *sqlCredo[T, I]) WithDebugFunc(newDebugFunc api.DebugFunc) SQLCredo[T, I] {
+func (r *sqlCredo[T, I]) WithDebugFunc(newDebugFunc DebugFunc) SQLCredo[T, I] {
 	r.DebugFunc = newDebugFunc
 	return r
 }
 
 // GetDebugFunc returns the currently set debug function.
 // Returns nil if no debug function has been set.
-func (r *sqlCredo[T, I]) GetDebugFunc() api.DebugFunc {
+func (r *sqlCredo[T, I]) GetDebugFunc() DebugFunc {
 	return r.DebugFunc
 }

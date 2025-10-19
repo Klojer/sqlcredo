@@ -6,10 +6,11 @@ import (
 	"testing"
 	"time"
 
+	sc "github.com/Klojer/sqlcredo"
+	"github.com/Klojer/sqlcredo/internal/domain"
 	"github.com/Klojer/sqlcredo/internal/mocks"
 	"github.com/Klojer/sqlcredo/internal/page"
 	"github.com/Klojer/sqlcredo/internal/table"
-	"github.com/Klojer/sqlcredo/pkg/api"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -24,13 +25,13 @@ func TestPageResolver_GetPage(t *testing.T) {
 	testCases := []struct {
 		desc          string
 		configureMock func(context.Context, *testCaseData)
-		opts          []api.PageOpt
-		want          api.Page[testObj]
+		opts          []domain.PageOpt
+		want          domain.Page[testObj]
 		wantErr       string
 	}{
 		{
 			desc: "base positive case",
-			opts: []api.PageOpt{api.WithPageNumber(0), api.WithPageSize(2)},
+			opts: []domain.PageOpt{sc.WithPageNumber(0), sc.WithPageSize(2)},
 			configureMock: func(ctx context.Context, c *testCaseData) {
 				c.Executor.On("SelectMany", ctx, mock.Anything,
 					"SELECT * FROM `test_table` ORDER BY `id` ASC LIMIT ?", []any{int64(2)}).
@@ -41,7 +42,7 @@ func TestPageResolver_GetPage(t *testing.T) {
 					Return(nil)
 				c.Executor.SetOnSelectOneCb(replaceDestWithUint64(t, 3))
 			},
-			want: api.Page[testObj]{
+			want: domain.Page[testObj]{
 				Number:     0,
 				Size:       2,
 				Total:      3,
@@ -51,7 +52,7 @@ func TestPageResolver_GetPage(t *testing.T) {
 		},
 		{
 			desc: "empty page",
-			opts: []api.PageOpt{api.WithPageNumber(0), api.WithPageSize(2)},
+			opts: []domain.PageOpt{sc.WithPageNumber(0), sc.WithPageSize(2)},
 			configureMock: func(ctx context.Context, c *testCaseData) {
 				c.Executor.On("SelectMany", ctx, mock.Anything,
 					"SELECT * FROM `test_table` ORDER BY `id` ASC LIMIT ?", []any{int64(2)}).
@@ -62,11 +63,11 @@ func TestPageResolver_GetPage(t *testing.T) {
 					Return(nil)
 				c.Executor.SetOnSelectOneCb(replaceDestWithUint64(t, 0))
 			},
-			want: api.NewPage[testObj](),
+			want: sc.NewPage[testObj](),
 		},
 		{
 			desc: "reverse sort order",
-			opts: []api.PageOpt{api.WithPageNumber(0), api.WithPageSize(2), api.WithSortDesc("id")},
+			opts: []domain.PageOpt{sc.WithPageNumber(0), sc.WithPageSize(2), sc.WithSortDesc("id")},
 			configureMock: func(ctx context.Context, c *testCaseData) {
 				c.Executor.On("SelectMany", ctx, mock.Anything,
 					"SELECT * FROM `test_table` ORDER BY `id` DESC LIMIT ?", []any{int64(2)}).
@@ -77,17 +78,17 @@ func TestPageResolver_GetPage(t *testing.T) {
 					Return(nil)
 				c.Executor.SetOnSelectOneCb(replaceDestWithUint64(t, 0))
 			},
-			want: api.NewPage[testObj](),
+			want: sc.NewPage[testObj](),
 		},
 		{
 			desc:          "invalid opts",
-			opts:          []api.PageOpt{api.WithPageSize(0)},
+			opts:          []domain.PageOpt{sc.WithPageSize(0)},
 			configureMock: func(ctx context.Context, c *testCaseData) {},
 			wantErr:       "unable to create page params",
 		},
 		{
 			desc: "select many fail",
-			opts: []api.PageOpt{api.WithPageNumber(0), api.WithPageSize(2)},
+			opts: []domain.PageOpt{sc.WithPageNumber(0), sc.WithPageSize(2)},
 			configureMock: func(ctx context.Context, c *testCaseData) {
 				c.Executor.On("SelectMany", ctx, mock.Anything,
 					"SELECT * FROM `test_table` ORDER BY `id` ASC LIMIT ?", []any{int64(2)}).
@@ -97,7 +98,7 @@ func TestPageResolver_GetPage(t *testing.T) {
 		},
 		{
 			desc: "select one fail",
-			opts: []api.PageOpt{api.WithPageNumber(0), api.WithPageSize(2)},
+			opts: []domain.PageOpt{sc.WithPageNumber(0), sc.WithPageSize(2)},
 			configureMock: func(ctx context.Context, c *testCaseData) {
 				c.Executor.On("SelectMany", ctx, mock.Anything,
 					"SELECT * FROM `test_table` ORDER BY `id` ASC LIMIT ?", []any{int64(2)}).
@@ -115,12 +116,12 @@ func TestPageResolver_GetPage(t *testing.T) {
 			tC.configureMock(ctx, c)
 
 			content := make([]testObj, 0)
-			got := api.NewPage(api.WithNewPageContent(&content))
+			got := sc.NewPage(sc.WithNewPageContent(&content))
 			gotErr := c.UnderTest.GetPage(ctx, &got, tC.opts...)
 
 			if tC.wantErr != "" {
 				assert.ErrorContains(t, gotErr, tC.wantErr)
-				assert.Equal(t, api.NewPage[testObj](), got)
+				assert.Equal(t, sc.NewPage[testObj](), got)
 			} else {
 				assert.NoError(t, gotErr)
 				assert.Equal(t, tC.want, got)
@@ -171,7 +172,7 @@ type testCaseData struct {
 	ctxCancel func()
 
 	Executor  *mocks.SQLExecutor
-	UnderTest api.PageResolver[testObj]
+	UnderTest domain.PageResolver[testObj]
 }
 
 func newTestCase(t *testing.T) (*testCaseData, context.Context) {

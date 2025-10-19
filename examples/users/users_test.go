@@ -12,8 +12,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	sc "github.com/Klojer/sqlcredo"
 	"github.com/Klojer/sqlcredo/examples/users"
-	"github.com/Klojer/sqlcredo/pkg/api"
 )
 
 type TestCaseDesc struct {
@@ -139,19 +139,19 @@ func CaseUpdateUser(t *testing.T, ctx context.Context, c *TestCaseData) {
 }
 
 func CaseValidatePageRequest(t *testing.T, ctx context.Context, c *TestCaseData) {
-	got := api.NewPage[users.Object]()
-	err := c.UnderTest.GetPage(ctx, &got, api.WithPageSize(0))
-	assert.ErrorIs(t, err, api.ErrInvalidPageSize)
+	got := sc.NewPage[users.Object]()
+	err := c.UnderTest.GetPage(ctx, &got, sc.WithPageSize(0))
+	assert.ErrorIs(t, err, sc.ErrInvalidPageSize)
 }
 
 func CaseGetPage(t *testing.T, ctx context.Context, c *TestCaseData) {
 	buff := make([]users.Object, 0, 10)
 
-	gotPage1 := api.NewPage(api.WithNewPageContent(&buff))
+	gotPage1 := sc.NewPage(sc.WithNewPageContent(&buff))
 	err := c.UnderTest.GetPage(ctx, &gotPage1,
-		api.WithPageNumber(0), api.WithPageSize(2))
+		sc.WithPageNumber(0), sc.WithPageSize(2))
 	assert.NoError(t, err)
-	assert.Equal(t, api.Page[users.Object]{
+	assert.Equal(t, sc.Page[users.Object]{
 		Number:     0,
 		Size:       2,
 		Total:      5,
@@ -160,11 +160,11 @@ func CaseGetPage(t *testing.T, ctx context.Context, c *TestCaseData) {
 	}, gotPage1)
 	buff = buff[:0]
 
-	gotPage2 := api.NewPage(api.WithNewPageContent(&buff))
+	gotPage2 := sc.NewPage(sc.WithNewPageContent(&buff))
 	err = c.UnderTest.GetPage(ctx, &gotPage2,
-		api.WithPageNumber(1), api.WithPageSize(2))
+		sc.WithPageNumber(1), sc.WithPageSize(2))
 	assert.NoError(t, err)
-	assert.Equal(t, api.Page[users.Object]{
+	assert.Equal(t, sc.Page[users.Object]{
 		Number:     1,
 		Size:       2,
 		Total:      5,
@@ -173,11 +173,11 @@ func CaseGetPage(t *testing.T, ctx context.Context, c *TestCaseData) {
 	}, gotPage2)
 	buff = buff[:0]
 
-	gotPage3 := api.NewPage(api.WithNewPageContent(&buff))
+	gotPage3 := sc.NewPage(sc.WithNewPageContent(&buff))
 	err = c.UnderTest.GetPage(ctx, &gotPage3,
-		api.WithPageNumber(2), api.WithPageSize(2))
+		sc.WithPageNumber(2), sc.WithPageSize(2))
 	assert.NoError(t, err)
-	assert.Equal(t, api.Page[users.Object]{
+	assert.Equal(t, sc.Page[users.Object]{
 		Number:     2,
 		Size:       1,
 		Total:      5,
@@ -187,12 +187,12 @@ func CaseGetPage(t *testing.T, ctx context.Context, c *TestCaseData) {
 }
 
 func CaseGetPageCustomOrder(t *testing.T, ctx context.Context, c *TestCaseData) {
-	gotPage := api.NewPage[users.Object]()
+	gotPage := sc.NewPage[users.Object]()
 	err := c.UnderTest.GetPage(ctx, &gotPage,
-		api.WithPageNumber(0),
-		api.WithPageSize(uint(len(c.TestUsers))),
-		api.WithSortBy("first_name"),
-		api.WithSortBy("last_name"),
+		sc.WithPageNumber(0),
+		sc.WithPageSize(uint(len(c.TestUsers))),
+		sc.WithSortBy("first_name"),
+		sc.WithSortBy("last_name"),
 	)
 	assert.NoError(t, err)
 	assert.Equal(t, strings.TrimSpace(`
@@ -270,7 +270,7 @@ func CaseTxRollback(t *testing.T, ctx context.Context, c *TestCaseData) {
 	assert.ErrorIs(t, err, sql.ErrNoRows)
 }
 
-func createDebugFunc(t *testing.T) api.DebugFunc {
+func createDebugFunc(t *testing.T) sc.DebugFunc {
 	return func(query string, args ...any) {
 		t.Helper()
 		t.Logf("query: [%s]; args: %+v\n", query, args)
