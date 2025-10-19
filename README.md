@@ -37,7 +37,6 @@ import (
  _ "github.com/mattn/go-sqlite3"
 
  sc "github.com/Klojer/sqlcredo"
- scapi "github.com/Klojer/sqlcredo/pkg/api"
 )
 
 type User struct {
@@ -74,9 +73,9 @@ func main() {
 
  // Read with pagination
  page, err := repo.GetPage(ctx,
-  scapi.WithPageNumber(0),
-  scapi.WithPageSize(10),
-  scapi.WithSortBy("name"))
+  sc.WithPageNumber(0),
+  sc.WithPageSize(10),
+  sc.WithSortBy("name"))
  orPanic(err)
  fmt.Printf("Page: %+v\n", page)
 
