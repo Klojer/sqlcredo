@@ -4,9 +4,8 @@ import (
 	"github.com/Klojer/sqlcredo/internal/domain"
 )
 
-type DebugFunc = domain.DebugFunc
-
 type (
+	DebugFunc                                = domain.DebugFunc
 	SQLExecutor                              = domain.SQLExecutor
 	CRUD[T any, I comparable]                = domain.CRUD[T, I]
 	Page[T any]                              = domain.Page[T]
