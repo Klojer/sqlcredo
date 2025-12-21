@@ -1,3 +1,8 @@
+// Package sqlcredo provides a type-safe generic SQL CRUD operations wrapper for Go.
+// It offers built-in CRUD operations, pagination support, transaction management,
+// and SQL query debugging capabilities. The package simplifies database interactions
+// by providing generic implementations for common database operations while allowing
+// custom raw SQL queries for extended functionality. Built on top of sqlx and goqu.
 package sqlcredo
 
 import (

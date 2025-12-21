@@ -1,3 +1,6 @@
+// Package transaction provides transaction management for sqlcredo operations.
+// It implements the Transaction interface, wrapping CRUD and pagination operations
+// within database transactions with commit and rollback capabilities.
 package transaction
 
 import (

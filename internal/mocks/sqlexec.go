@@ -1,3 +1,6 @@
+// Package mocks provides mock implementations for testing sqlcredo components.
+// It includes mock SQLExecutor and SQLResult types that implement the domain interfaces,
+// allowing for isolated unit testing of database operations.
 package mocks
 
 import (

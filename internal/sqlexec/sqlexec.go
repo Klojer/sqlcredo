@@ -1,3 +1,6 @@
+// Package sqlexec provides the SQL execution implementation for sqlcredo.
+// It wraps sqlx database operations with debugging support, implementing
+// the domain.SQLExecutor interface for executing queries and statements.
 package sqlexec
 
 import (

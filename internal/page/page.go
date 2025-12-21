@@ -1,3 +1,5 @@
+// Package page provides the pagination implementation for sqlcredo.
+// It implements the PageResolver interface, handling paginated queries.
 package page
 
 import (

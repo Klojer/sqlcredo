@@ -1,3 +1,6 @@
+// Package users demonstrates how to extend sqlcredo with custom SQL queries.
+// It provides a complete example of a user repository that includes standard CRUD operations
+// and a custom query method for counting users based on whether they have a last name.
 package users
 
 import (

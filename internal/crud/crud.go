@@ -1,3 +1,6 @@
+// Package crud provides the core CRUD operations implementation for sqlcredo.
+// It implements generic Create, Read, Update, and Delete operations using goqu
+// for query building, supporting multiple SQL dialects and prepared statements.
 package crud
 
 import (

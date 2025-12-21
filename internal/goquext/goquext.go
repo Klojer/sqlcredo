@@ -1,3 +1,6 @@
+// Package goquext provides utilities for working with goqu SQL query builder.
+// It handles dialect string creation and normalizes database driver names
+// to their corresponding goqu dialect identifiers.
 package goquext
 
 import (
