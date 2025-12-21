@@ -67,21 +67,21 @@ func (m *SQLExecutor) SetOnSelectManyCb(cb OnSelectCb) {
 }
 
 type SQLResult struct {
-	lastInsertIdValue int64
+	lastInsertIDValue int64
 	rowsAffectedValue int64
 }
 
 var _ sql.Result = &SQLResult{}
 
-func NewSQLResult(lastInsertId int64, rowsAffected int64) *SQLResult {
+func NewSQLResult(lastInsertID int64, rowsAffected int64) *SQLResult {
 	return &SQLResult{
-		lastInsertIdValue: lastInsertId,
+		lastInsertIDValue: lastInsertID,
 		rowsAffectedValue: rowsAffected,
 	}
 }
 
 func (r *SQLResult) LastInsertId() (int64, error) {
-	return r.lastInsertIdValue, nil
+	return r.lastInsertIDValue, nil
 }
 
 func (r *SQLResult) RowsAffected() (int64, error) {
