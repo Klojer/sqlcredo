@@ -40,6 +40,9 @@ type SQLCredo[T any, I comparable] interface {
 	// Returns the modified SQLCredo instance for method chaining.
 	WithDebugFunc(newDebugFunc DebugFunc) SQLCredo[T, I]
 
+	// TODO: add docs
+	WithTx(txExec SQLExecutor) SQLCredo[T, I]
+
 	// GetDebugFunc returns the currently set debug function.
 	// Returns nil if no debug function is set.
 	GetDebugFunc() DebugFunc
@@ -83,6 +86,17 @@ func NewSQLCredo[T any, I comparable](db *sql.DB, driver string, tableName strin
 
 func (r *sqlCredo[T, I]) BeginTx(ctx context.Context, opts *sql.TxOptions) (Transaction[T, I], error) {
 	return transaction.NewTx[T, I](ctx, r.dbx, r.tableInfo, r.driver, r.DebugFunc, opts)
+}
+
+func (r *sqlCredo[T, I]) WithTx(txExec SQLExecutor) SQLCredo[T, I] {
+	return &sqlCredo[T, I]{
+		SQLExecutor:  sqlexec.NewDelegatingExecutor(txExec, r.DebugFunc),
+		CRUD:         crud.NewCRUD[T, I](r.tableInfo, txExec, r.driver),
+		PageResolver: page.NewPageResolver[T](r.tableInfo, txExec, r.driver),
+		tableInfo:    r.tableInfo,
+		driver:       r.driver,
+		dbx:          r.dbx,
+	}
 }
 
 // InitSchema executes a SQL query to initialize the database schema.

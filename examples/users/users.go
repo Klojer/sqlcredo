@@ -41,6 +41,10 @@ func NewRepo(db *sql.DB, driver string, debugFunc sc.DebugFunc) *Repo {
 	}
 }
 
+func (r *Repo) WithTxx(txExec sc.SQLExecutor) *Repo {
+	return &Repo{SQLCredo: r.SQLCredo.WithTx(txExec)}
+}
+
 const CountByLastNameExistsQuery = `
 SELECT 'with last_name' as category, COUNT(*) as cnt FROM users WHERE last_name IS NOT NULL
 UNION
