@@ -270,6 +270,41 @@ func CaseTxRollback(t *testing.T, ctx context.Context, c *TestCaseData) {
 	assert.ErrorIs(t, err, sql.ErrNoRows)
 }
 
+func CaseGetUserWithArticles(t *testing.T, ctx context.Context, c *TestCaseData) {
+	article := &users.Article{
+		ID: "a0", Title: "Test Article", CreatedAt: time.Now().Truncate(time.Second), UserID: c.TestUsers[0].ID,
+	}
+	_, err := c.UnderTest.Articles().Create(ctx, article)
+	require.NoError(t, err)
+
+	var got users.Object
+	err = c.UnderTest.GetWithArticles(ctx, &got, c.TestUsers[0].ID)
+	require.NoError(t, err)
+
+	assert.Equal(t, c.TestUsers[0].ID, got.ID)
+	require.Len(t, got.Articles, 1)
+	assert.Equal(t, article.ID, got.Articles[0].ID)
+}
+
+func CaseDeleteUserWithArticles(t *testing.T, ctx context.Context, c *TestCaseData) {
+	article := &users.Article{
+		ID: "a0", Title: "Test Article", CreatedAt: time.Now().Truncate(time.Second), UserID: c.TestUsers[0].ID,
+	}
+	_, err := c.UnderTest.Articles().Create(ctx, article)
+	require.NoError(t, err)
+
+	err = c.UnderTest.DeleteWithArticles(ctx, c.TestUsers[0].ID)
+	assert.NoError(t, err)
+
+	var gotUser users.Object
+	err = c.UnderTest.GetByID(ctx, &gotUser, c.TestUsers[0].ID)
+	assert.ErrorIs(t, err, sql.ErrNoRows)
+
+	var gotArticle users.Article
+	err = c.UnderTest.Articles().GetByID(ctx, &gotArticle, article.ID)
+	assert.ErrorIs(t, err, sql.ErrNoRows)
+}
+
 func createDebugFunc(t *testing.T) sc.DebugFunc {
 	return func(query string, args ...any) {
 		t.Helper()
@@ -286,7 +321,7 @@ func newTime(input string) time.Time {
 	return result
 }
 
-func wrapWithPtrs[T comparable](input []T) []*T {
+func wrapWithPtrs[T any](input []T) []*T {
 	result := make([]*T, 0, len(input))
 	for _, i := range input {
 		result = append(result, ptr(i))
@@ -294,7 +329,7 @@ func wrapWithPtrs[T comparable](input []T) []*T {
 	return result
 }
 
-func ptr[T comparable](input T) *T {
+func ptr[T any](input T) *T {
 	return &input
 }
 

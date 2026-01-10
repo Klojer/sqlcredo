@@ -23,6 +23,13 @@ CREATE TABLE IF NOT EXISTS "users" (
     last_name TEXT NULL,
     birth_date TIMESTAMP NOT NULL
 );
+CREATE TABLE IF NOT EXISTS "articles" (
+    id TEXT NOT NULL PRIMARY KEY,
+    title TEXT NOT NULL,
+    created_at TIMESTAMP NOT NULL,
+    user_id TEXT NOT NULL,
+    FOREIGN KEY(user_id) REFERENCES "users"(id)
+);
 `
 )
 
@@ -45,6 +52,8 @@ func TestPostgres(t *testing.T) {
 		{name: "count-by-last-name-exists-ctx-err", run: CaseCountByLastNameExistsCtxError},
 		{name: "tx-commit", run: CaseTxCommit},
 		{name: "tx-rollback", run: CaseTxRollback},
+		{name: "get-user-with-articles", run: CaseGetUserWithArticles},
+		{name: "delete-user-with-articles", run: CaseDeleteUserWithArticles},
 	}
 	for _, tC := range testCases {
 		t.Run(tC.name, func(t *testing.T) {
@@ -56,7 +65,9 @@ func TestPostgres(t *testing.T) {
 
 			tC.run(t, ctx, caze)
 
-			_, err := caze.UnderTest.DeleteAll(ctx)
+			_, err := caze.UnderTest.Articles().DeleteAll(ctx)
+			require.NoError(t, err)
+			_, err = caze.DB.ExecContext(ctx, "TRUNCATE TABLE users CASCADE")
 			require.NoError(t, err)
 			caze.CtxCancel()
 		})
