@@ -82,6 +82,90 @@ func TestSQLCredo_DebugFunc(t *testing.T) {
 	assert.True(t, debugCalled)
 }
 
+func TestSQLCredo_BeginTx(t *testing.T) {
+	tests := []struct {
+		name    string
+		setup   func() (context.Context, func())
+		wantErr bool
+	}{
+		{
+			name: "successful transaction",
+			setup: func() (context.Context, func()) {
+				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				return ctx, cancel
+			},
+			wantErr: false,
+		},
+		{
+			name: "cancelled context",
+			setup: func() (context.Context, func()) {
+				ctx, cancel := context.WithCancel(context.Background())
+				cancel() // cancel immediately
+				return ctx, func() {}
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c, _ := newTestCase(t)
+			ctx, cancel := tt.setup()
+			defer cancel()
+
+			tx, err := c.UnderTest.BeginTx(ctx, nil)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				assert.Nil(t, tx)
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, tx)
+				// Clean up transaction
+				err = tx.Rollback()
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestSQLCredo_WithTx(t *testing.T) {
+	c, _ := newTestCase(t)
+
+	// Create a mock executor
+	mockExec := &mockSQLExecutor{}
+
+	// Call WithTx
+	credoWithTx := c.UnderTest.WithTx(mockExec)
+
+	// Verify it's a different instance
+	assert.NotEqual(t, fmt.Sprintf("%p", c.UnderTest), fmt.Sprintf("%p", credoWithTx))
+
+	// Verify driver is preserved
+	assert.Equal(t, c.UnderTest.GetDriver(), credoWithTx.GetDriver())
+}
+
+// mockSQLExecutor implements SQLExecutor for testing
+type mockSQLExecutor struct{}
+
+func (m *mockSQLExecutor) SelectOne(ctx context.Context, dest any, query string, args ...any) error {
+	return nil
+}
+
+func (m *mockSQLExecutor) SelectMany(ctx context.Context, dest any, query string, args ...any) error {
+	return nil
+}
+
+func (m *mockSQLExecutor) Exec(ctx context.Context, query string, args ...any) (sql.Result, error) {
+	return nil, nil
+}
+
+func TestSQLCredo_GetDriver(t *testing.T) {
+	c, _ := newTestCase(t)
+
+	assert.Equal(t, "sqlite3", c.UnderTest.GetDriver())
+}
+
 type testCaseData struct {
 	ctx       context.Context
 	ctxCancel func()
