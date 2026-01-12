@@ -40,7 +40,11 @@ type SQLCredo[T any, I comparable] interface {
 	// Returns the modified SQLCredo instance for method chaining.
 	WithDebugFunc(newDebugFunc DebugFunc) SQLCredo[T, I]
 
-	// TODO: add docs
+	// WithTx creates a new SQLCredo instance that uses the provided SQLExecutor.
+	// This is typically used to execute operations within a database transaction.
+	// The returned instance preserves the original table information and driver,
+	// but uses the provided executor for all database operations.
+	// The debug function from the original instance is also preserved.
 	WithTx(txExec SQLExecutor) SQLCredo[T, I]
 
 	// GetDebugFunc returns the currently set debug function.
