@@ -46,6 +46,9 @@ type SQLCredo[T any, I comparable] interface {
 	// GetDebugFunc returns the currently set debug function.
 	// Returns nil if no debug function is set.
 	GetDebugFunc() DebugFunc
+
+	// GetDebugFunc returns current db driver.
+	GetDriver() string
 }
 
 type sqlCredo[T any, I comparable] struct {
@@ -122,4 +125,9 @@ func (r *sqlCredo[T, I]) WithDebugFunc(newDebugFunc DebugFunc) SQLCredo[T, I] {
 // Returns nil if no debug function has been set.
 func (r *sqlCredo[T, I]) GetDebugFunc() DebugFunc {
 	return r.DebugFunc
+}
+
+// GetDriver returns current db driver.
+func (r *sqlCredo[T, I]) GetDriver() string {
+	return r.driver
 }
