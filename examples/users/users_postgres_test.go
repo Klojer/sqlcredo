@@ -54,6 +54,8 @@ func TestPostgres(t *testing.T) {
 		{name: "tx-rollback", run: CaseTxRollback},
 		{name: "get-user-with-articles", run: CaseGetUserWithArticles},
 		{name: "delete-user-with-articles", run: CaseDeleteUserWithArticles},
+		{name: "create-user-with-article-positive", run: CaseCreateUserWithArticlePositive},
+		{name: "create-user-with-article-negative", run: CaseCreateUserWithArticleNegative},
 	}
 	for _, tC := range testCases {
 		t.Run(tC.name, func(t *testing.T) {

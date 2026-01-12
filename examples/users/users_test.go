@@ -27,8 +27,8 @@ type TestCaseParams struct {
 	DB     *sql.DB
 }
 
-func createTestUsers() ([]users.Object, []*users.Object) {
-	values := []users.Object{
+func createTestUsers() ([]users.User, []*users.User) {
+	values := []users.User{
 		{ID: "u0", FirstName: "John", LastName: ptr("Smith"), BirthDate: newTime("1989-03-05")},
 		{ID: "u1", FirstName: "Carl", LastName: nil, BirthDate: newTime("1973-01-09")},
 		{ID: "u2", FirstName: "Ann", LastName: ptr("Stone"), BirthDate: newTime("1987-03-01")},
@@ -43,8 +43,8 @@ type TestCaseData struct {
 	Ctx       context.Context
 	CtxCancel func()
 
-	TestUsers    []users.Object
-	TestUserPtrs []*users.Object
+	TestUsers    []users.User
+	TestUserPtrs []*users.User
 
 	DB        *sql.DB
 	UnderTest *users.Repo
@@ -81,46 +81,46 @@ func NewTestCase(t *testing.T, params TestCaseParams) (*TestCaseData, context.Co
 }
 
 func CaseCreateUser(t *testing.T, ctx context.Context, c *TestCaseData) {
-	expected := &users.Object{
+	expected := &users.User{
 		ID: "u99", FirstName: "Gordon",
 		LastName: ptr("Gibs"), BirthDate: newTime("1931-09-03"),
 	}
 	_, err := c.UnderTest.Create(ctx, expected)
 	assert.NoError(t, err)
 
-	var got users.Object
+	var got users.User
 	err = c.UnderTest.GetByID(ctx, &got, expected.ID)
 	assert.NoError(t, err)
 	assert.Equal(t, *expected, got)
 }
 
 func CaseGetAllUsers(t *testing.T, ctx context.Context, c *TestCaseData) {
-	got := make([]users.Object, 0)
+	got := make([]users.User, 0)
 	err := c.UnderTest.GetAll(ctx, &got)
 	assert.NoError(t, err)
 	assert.Equal(t, c.TestUsers, got)
 }
 
 func CaseGetUserByID(t *testing.T, ctx context.Context, c *TestCaseData) {
-	var got users.Object
+	var got users.User
 	err := c.UnderTest.GetByID(ctx, &got, c.TestUsers[2].ID)
 	assert.NoError(t, err)
 	assert.Equal(t, c.TestUsers[2], got)
 }
 
 func CaseGetUsersByIDs(t *testing.T, ctx context.Context, c *TestCaseData) {
-	got := make([]users.Object, 0)
+	got := make([]users.User, 0)
 	ids := []users.Identity{c.TestUserPtrs[1].ID, c.TestUserPtrs[2].ID}
 	err := c.UnderTest.GetByIDs(ctx, &got, ids)
 	assert.NoError(t, err)
-	assert.Equal(t, []users.Object{c.TestUsers[1], c.TestUsers[2]}, got)
+	assert.Equal(t, []users.User{c.TestUsers[1], c.TestUsers[2]}, got)
 }
 
 func CaseDeleteUser(t *testing.T, ctx context.Context, c *TestCaseData) {
 	_, err := c.UnderTest.Delete(ctx, c.TestUsers[1].ID)
 	assert.NoError(t, err)
 
-	var got users.Object
+	var got users.User
 	err = c.UnderTest.GetByID(ctx, &got, c.TestUsers[1].ID)
 	assert.ErrorIs(t, err, sql.ErrNoRows)
 }
@@ -132,26 +132,26 @@ func CaseUpdateUser(t *testing.T, ctx context.Context, c *TestCaseData) {
 	_, err := c.UnderTest.Update(ctx, updated.ID, updated)
 	assert.NoError(t, err)
 
-	var got users.Object
+	var got users.User
 	err = c.UnderTest.GetByID(ctx, &got, c.TestUsers[1].ID)
 	assert.NoError(t, err)
 	assert.Equal(t, *updated, got)
 }
 
 func CaseValidatePageRequest(t *testing.T, ctx context.Context, c *TestCaseData) {
-	got := sc.NewPage[users.Object]()
+	got := sc.NewPage[users.User]()
 	err := c.UnderTest.GetPage(ctx, &got, sc.WithPageSize(0))
 	assert.ErrorIs(t, err, sc.ErrInvalidPageSize)
 }
 
 func CaseGetPage(t *testing.T, ctx context.Context, c *TestCaseData) {
-	buff := make([]users.Object, 0, 10)
+	buff := make([]users.User, 0, 10)
 
 	gotPage1 := sc.NewPage(sc.WithNewPageContent(&buff))
 	err := c.UnderTest.GetPage(ctx, &gotPage1,
 		sc.WithPageNumber(0), sc.WithPageSize(2))
 	assert.NoError(t, err)
-	assert.Equal(t, sc.Page[users.Object]{
+	assert.Equal(t, sc.Page[users.User]{
 		Number:     0,
 		Size:       2,
 		Total:      5,
@@ -164,7 +164,7 @@ func CaseGetPage(t *testing.T, ctx context.Context, c *TestCaseData) {
 	err = c.UnderTest.GetPage(ctx, &gotPage2,
 		sc.WithPageNumber(1), sc.WithPageSize(2))
 	assert.NoError(t, err)
-	assert.Equal(t, sc.Page[users.Object]{
+	assert.Equal(t, sc.Page[users.User]{
 		Number:     1,
 		Size:       2,
 		Total:      5,
@@ -177,7 +177,7 @@ func CaseGetPage(t *testing.T, ctx context.Context, c *TestCaseData) {
 	err = c.UnderTest.GetPage(ctx, &gotPage3,
 		sc.WithPageNumber(2), sc.WithPageSize(2))
 	assert.NoError(t, err)
-	assert.Equal(t, sc.Page[users.Object]{
+	assert.Equal(t, sc.Page[users.User]{
 		Number:     2,
 		Size:       1,
 		Total:      5,
@@ -187,7 +187,7 @@ func CaseGetPage(t *testing.T, ctx context.Context, c *TestCaseData) {
 }
 
 func CaseGetPageCustomOrder(t *testing.T, ctx context.Context, c *TestCaseData) {
-	gotPage := sc.NewPage[users.Object]()
+	gotPage := sc.NewPage[users.User]()
 	err := c.UnderTest.GetPage(ctx, &gotPage,
 		sc.WithPageNumber(0),
 		sc.WithPageSize(uint(len(c.TestUsers))),
@@ -233,7 +233,7 @@ func CaseTxCommit(t *testing.T, ctx context.Context, c *TestCaseData) {
 	tx, err := c.UnderTest.BeginTx(ctx, nil)
 	assert.NoError(t, err)
 
-	expected := &users.Object{
+	expected := &users.User{
 		ID: "u99", FirstName: "Gordon",
 		LastName: ptr("Gibs"), BirthDate: newTime("1931-09-03"),
 	}
@@ -244,7 +244,7 @@ func CaseTxCommit(t *testing.T, ctx context.Context, c *TestCaseData) {
 	err = tx.Commit()
 	assert.NoError(t, err)
 
-	var got users.Object
+	var got users.User
 	err = c.UnderTest.GetByID(ctx, &got, expected.ID)
 	assert.NoError(t, err)
 	assert.Equal(t, expected.ID, got.ID)
@@ -254,7 +254,7 @@ func CaseTxRollback(t *testing.T, ctx context.Context, c *TestCaseData) {
 	tx, err := c.UnderTest.BeginTx(ctx, nil)
 	assert.NoError(t, err)
 
-	user := &users.Object{
+	user := &users.User{
 		ID: "u99", FirstName: "Gordon",
 		LastName: ptr("Gibs"), BirthDate: newTime("1931-09-03"),
 	}
@@ -265,7 +265,7 @@ func CaseTxRollback(t *testing.T, ctx context.Context, c *TestCaseData) {
 	err = tx.Rollback()
 	assert.NoError(t, err)
 
-	var got users.Object
+	var got users.User
 	err = c.UnderTest.GetByID(ctx, &got, "u99")
 	assert.ErrorIs(t, err, sql.ErrNoRows)
 }
@@ -277,7 +277,7 @@ func CaseGetUserWithArticles(t *testing.T, ctx context.Context, c *TestCaseData)
 	_, err := c.UnderTest.Articles().Create(ctx, article)
 	require.NoError(t, err)
 
-	var got users.Object
+	var got users.User
 	err = c.UnderTest.GetWithArticles(ctx, &got, c.TestUsers[0].ID)
 	require.NoError(t, err)
 
@@ -296,13 +296,55 @@ func CaseDeleteUserWithArticles(t *testing.T, ctx context.Context, c *TestCaseDa
 	err = c.UnderTest.DeleteWithArticles(ctx, c.TestUsers[0].ID)
 	assert.NoError(t, err)
 
-	var gotUser users.Object
+	var gotUser users.User
 	err = c.UnderTest.GetByID(ctx, &gotUser, c.TestUsers[0].ID)
 	assert.ErrorIs(t, err, sql.ErrNoRows)
 
 	var gotArticle users.Article
 	err = c.UnderTest.Articles().GetByID(ctx, &gotArticle, article.ID)
 	assert.ErrorIs(t, err, sql.ErrNoRows)
+}
+
+func CaseCreateUserWithArticlePositive(t *testing.T, ctx context.Context, c *TestCaseData) {
+	user := &users.User{
+		ID: "u99", FirstName: "Test", LastName: ptr("User"),
+		BirthDate: newTime("1990-01-01"),
+	}
+	article := &users.Article{
+		ID: "a99", Title: "Test Article", CreatedAt: time.Now().Truncate(time.Second),
+		UserID: user.ID,
+	}
+
+	err := c.UnderTest.CreateWithArticle(ctx, user, article)
+	assert.NoError(t, err)
+
+	var gotUser users.User
+	err = c.UnderTest.GetByID(ctx, &gotUser, user.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, user.ID, gotUser.ID)
+
+	var gotArticle users.Article
+	err = c.UnderTest.Articles().GetByID(ctx, &gotArticle, article.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, article.ID, gotArticle.ID)
+}
+
+func CaseCreateUserWithArticleNegative(t *testing.T, ctx context.Context, c *TestCaseData) {
+	user := &users.User{
+		ID: "u100", FirstName: "Test", LastName: ptr("User"),
+		BirthDate: newTime("1990-01-01"),
+	}
+	article := &users.Article{
+		ID: "a100", Title: "Test Article", CreatedAt: time.Now().Truncate(time.Second),
+		UserID: "non-existing-user", // Invalid foreign key should cause article creation to fail
+	}
+
+	err := c.UnderTest.CreateWithArticle(ctx, user, article)
+	assert.Error(t, err)
+
+	var gotUser users.User
+	err = c.UnderTest.GetByID(ctx, &gotUser, user.ID)
+	assert.ErrorIs(t, err, sql.ErrNoRows) // Should not exist due to rollback
 }
 
 func createDebugFunc(t *testing.T) sc.DebugFunc {
@@ -333,7 +375,7 @@ func ptr[T any](input T) *T {
 	return &input
 }
 
-func usersToString(objects ...users.Object) string {
+func usersToString(objects ...users.User) string {
 	res := bytes.Buffer{}
 
 	for _, o := range objects {

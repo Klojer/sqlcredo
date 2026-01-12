@@ -26,18 +26,6 @@ type Article struct {
 	UserID    Identity  `db:"user_id"`
 }
 
-type Object struct {
-	ID        Identity  `db:"id"`
-	FirstName string    `db:"first_name"`
-	LastName  *string   `db:"last_name"`
-	BirthDate time.Time `db:"birth_date"`
-	Articles  []Article `db:"-"`
-}
-
-func (u *Object) String() string {
-	return fmt.Sprintf("%v", *u)
-}
-
 type ArticlesRepo struct {
 	sc.SQLCredo[Article, Identity]
 }
@@ -53,14 +41,26 @@ func (r *ArticlesRepo) WithTxx(txExec sc.SQLExecutor) *ArticlesRepo {
 	return &ArticlesRepo{SQLCredo: r.SQLCredo.WithTx(txExec)}
 }
 
+type User struct {
+	ID        Identity  `db:"id"`
+	FirstName string    `db:"first_name"`
+	LastName  *string   `db:"last_name"`
+	BirthDate time.Time `db:"birth_date"`
+	Articles  []Article `db:"-"`
+}
+
+func (u *User) String() string {
+	return fmt.Sprintf("%v", *u)
+}
+
 type Repo struct {
-	sc.SQLCredo[Object, Identity]
+	sc.SQLCredo[User, Identity]
 	articlesRepo *ArticlesRepo
 }
 
 func NewRepo(db *sql.DB, driver string, debugFunc sc.DebugFunc) *Repo {
 	return &Repo{
-		SQLCredo: sc.NewSQLCredo[Object, Identity](db, driver, TableName, IDColumn).
+		SQLCredo: sc.NewSQLCredo[User, Identity](db, driver, TableName, IDColumn).
 			WithDebugFunc(debugFunc),
 		articlesRepo: NewArticlesRepo(db, driver, debugFunc),
 	}
@@ -77,19 +77,41 @@ func (r *Repo) Articles() *ArticlesRepo {
 	return r.articlesRepo
 }
 
-func (r *Repo) GetWithArticles(ctx context.Context, dest *Object, id Identity) error {
+func (r *Repo) GetWithArticles(ctx context.Context, dest *User, id Identity) error {
 	if err := r.GetByID(ctx, dest, id); err != nil {
 		return fmt.Errorf("unable to get user: %w", err)
 	}
 
+	// TODO: to article repo
 	var articles []Article
-	query := "SELECT * FROM articles WHERE user_id = ?"
+	query := fmt.Sprintf("SELECT * FROM articles WHERE user_id = %s",
+		getPlaceholder(r.GetDriver()))
 	if err := r.articlesRepo.SelectMany(ctx, &articles, query, id); err != nil {
 		return fmt.Errorf("unable to get articles: %w", err)
 	}
 	dest.Articles = articles
 
 	return nil
+}
+
+func (r *Repo) CreateWithArticle(ctx context.Context, user *User, article *Article) error {
+	tx, err := r.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	txRepo := r.WithTxx(tx)
+
+	if _, err := txRepo.Create(ctx, user); err != nil {
+		return err
+	}
+
+	if _, err := txRepo.Articles().Create(ctx, article); err != nil {
+		return err
+	}
+
+	return tx.Commit()
 }
 
 func (r *Repo) DeleteWithArticles(ctx context.Context, id Identity) error {
@@ -101,7 +123,9 @@ func (r *Repo) DeleteWithArticles(ctx context.Context, id Identity) error {
 
 	txRepo := r.WithTxx(tx)
 
-	query := "DELETE FROM articles WHERE user_id = ?"
+	// TODO: to articles repo
+	query := fmt.Sprintf("DELETE FROM articles WHERE user_id = %s",
+		getPlaceholder(r.GetDriver()))
 	if _, err := txRepo.Articles().Exec(ctx, query, id); err != nil {
 		return fmt.Errorf("unable to delete articles: %w", err)
 	}
@@ -136,4 +160,11 @@ func (r *Repo) CountByLastNameExists(ctx context.Context) (map[string]int, error
 	}
 
 	return res, nil
+}
+
+func getPlaceholder(driver string) string {
+	if driver == "postgres" || driver == "pgx" {
+		return "$1"
+	}
+	return "?"
 }
