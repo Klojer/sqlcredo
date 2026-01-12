@@ -38,7 +38,21 @@ func NewArticlesRepo(db *sql.DB, driver string, debugFunc sc.DebugFunc) *Article
 }
 
 func (r *ArticlesRepo) WithTxx(txExec sc.SQLExecutor) *ArticlesRepo {
-	return &ArticlesRepo{SQLCredo: r.SQLCredo.WithTx(txExec)}
+	return &ArticlesRepo{SQLCredo: r.WithTx(txExec)}
+}
+
+func (r *ArticlesRepo) GetByUserID(ctx context.Context, userID Identity) ([]Article, error) {
+	var articles []Article
+	query := fmt.Sprintf("SELECT * FROM articles WHERE user_id = %s", getPlaceholder(r.GetDriver()))
+	if err := r.SelectMany(ctx, &articles, query, userID); err != nil {
+		return nil, err
+	}
+	return articles, nil
+}
+
+func (r *ArticlesRepo) DeleteByUserID(ctx context.Context, userID Identity) (sql.Result, error) {
+	query := fmt.Sprintf("DELETE FROM articles WHERE user_id = %s", getPlaceholder(r.GetDriver()))
+	return r.Exec(ctx, query, userID)
 }
 
 type User struct {
@@ -68,7 +82,7 @@ func NewRepo(db *sql.DB, driver string, debugFunc sc.DebugFunc) *Repo {
 
 func (r *Repo) WithTxx(txExec sc.SQLExecutor) *Repo {
 	return &Repo{
-		SQLCredo:     r.SQLCredo.WithTx(txExec),
+		SQLCredo:     r.WithTx(txExec),
 		articlesRepo: r.articlesRepo.WithTxx(txExec),
 	}
 }
@@ -82,11 +96,8 @@ func (r *Repo) GetWithArticles(ctx context.Context, dest *User, id Identity) err
 		return fmt.Errorf("unable to get user: %w", err)
 	}
 
-	// TODO: to article repo
-	var articles []Article
-	query := fmt.Sprintf("SELECT * FROM articles WHERE user_id = %s",
-		getPlaceholder(r.GetDriver()))
-	if err := r.articlesRepo.SelectMany(ctx, &articles, query, id); err != nil {
+	articles, err := r.articlesRepo.GetByUserID(ctx, id)
+	if err != nil {
 		return fmt.Errorf("unable to get articles: %w", err)
 	}
 	dest.Articles = articles
@@ -123,10 +134,7 @@ func (r *Repo) DeleteWithArticles(ctx context.Context, id Identity) error {
 
 	txRepo := r.WithTxx(tx)
 
-	// TODO: to articles repo
-	query := fmt.Sprintf("DELETE FROM articles WHERE user_id = %s",
-		getPlaceholder(r.GetDriver()))
-	if _, err := txRepo.Articles().Exec(ctx, query, id); err != nil {
+	if _, err := txRepo.Articles().DeleteByUserID(ctx, id); err != nil {
 		return fmt.Errorf("unable to delete articles: %w", err)
 	}
 
